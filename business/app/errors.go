@@ -5,31 +5,31 @@ import (
 	"fmt"
 )
 
-var BalanceError = errors.New("Balance error")
+var ErrorBalance = errors.New("Balance error")
 
-type BalanceErrorValue struct {
+type ErrorBalanceValue struct {
 	Balance float64
 	Cost    float64
 }
 
-func (e *BalanceErrorValue) Unwrap() error {
-	return BalanceError
+func (e *ErrorBalanceValue) Unwrap() error {
+	return ErrorBalance
 }
 
-func (e *BalanceErrorValue) Error() string {
+func (e *ErrorBalanceValue) Error() string {
 	return fmt.Sprintf("saldo: %.2f", e.Balance)
 }
 
-var QrError = errors.New("QR error")
+var ErrorQR = errors.New("QR error")
 
-type QrErrorValue struct {
+type ErrorQRValue struct {
 	Value string
 }
 
-func (e *QrErrorValue) Unwrap() error {
-	return QrError
+func (e *ErrorQRValue) Unwrap() error {
+	return ErrorQR
 }
 
-func (e *QrErrorValue) Error() string {
+func (e *ErrorQRValue) Error() string {
 	return fmt.Sprintf("%s", e.Value)
 }

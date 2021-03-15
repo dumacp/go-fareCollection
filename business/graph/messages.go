@@ -2,6 +2,7 @@ package graph
 
 type MsgWaitTag struct{}
 type MsgWriteError struct{}
+type MsgQrError struct{}
 type MsgBalanceError struct {
 	Value string
 }
