@@ -1,12 +1,9 @@
 package app
 
 import (
-	"errors"
 	"fmt"
 	"log"
-	"time"
 
-	"github.com/dumacp/go-fareCollection/business/graph"
 	"github.com/looplab/fsm"
 )
 
@@ -99,7 +96,7 @@ func newFSM(callbacks *fsm.Callbacks) *fsm.FSM {
 func RunFSM(f *fsm.FSM) {
 
 	stepPending := false
-	dataTag := make(map[string]interface{})
+	// dataTag := make(map[string]interface{})
 
 	for {
 
@@ -114,18 +111,7 @@ func RunFSM(f *fsm.FSM) {
 			}
 			f.Event(eCardDetected)
 		case sValidationCard:
-			if err := ValidationTag(data); err != nil {
-				if errors.Is(err, ErrorBalance) {
-					//Send Msg Error Balance
-					if balanceErr, ok := err.(*ErrorBalanceValue); ok {
-						ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: fmt.Sprintf("%.02f", balanceErr.Balance)})
-					} else {
-						ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: ""})
-					}
-				}
-				time.Sleep(3 * time.Second)
-				return err
-			}
+
 		}
 
 	}
