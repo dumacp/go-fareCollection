@@ -59,6 +59,17 @@ func (a *Actor) Receive(ctx actor.Context) {
 			break
 		}
 		pubsub.Publish(topicGraph, sendMsg)
+	case *MsgError:
+		screen3 := &Screen{
+			ID:  3,
+			Msg: msg.Value,
+		}
+		sendMsg, err := funScreen(screen3)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg)
 	case *MsgWriteError:
 		screen3 := &Screen{
 			ID:  3,

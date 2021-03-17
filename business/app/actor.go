@@ -8,6 +8,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/business/graph"
 	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/looplab/fsm"
 )
 
 type Actor struct {
@@ -16,6 +17,12 @@ type Actor struct {
 	errorWriteTag  uint64
 	actualTag      uint64
 	pidGraph       *actor.PID
+	pidBuzzer      *actor.PID
+	pidPicto       *actor.PID
+	inputs         int
+	fmachine       *fsm.FSM
+	lastTime       time.Time
+	ctx            actor.Context
 }
 
 func NewActor() actor.Actor {
@@ -54,10 +61,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgTagRead:
 		if err := func() error {
-			if a.actualTag == a.errorWriteTag {
-				//Commit Tag
-				return nil
-			}
+			// if a.actualTag == a.errorWriteTag {
+			// 	//Commit Tag
+			// 	return nil
+			// }
 			if err := ValidationTag(msg.Data); err != nil {
 				if errors.Is(err, ErrorBalance) {
 					//Send Msg Error Balance

@@ -3,35 +3,28 @@ package app
 import (
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/dumacp/go-fareCollection/business/buzzer"
+	"github.com/dumacp/go-fareCollection/business/graph"
 	"github.com/looplab/fsm"
 )
 
 const (
 	sStart     = "sStart"
 	sDetectTag = "sDetectTag"
-	sReadCard  = "sReadTag"
-	sReadQR    = "sReadQR"
-	sWriteCard = "sWriteCard"
-	// sErrorTag       = "sErrorTag"
 	sValidationCard = "sValidationCard"
 	sValidationQR   = "sValidationQR"
-	sWaitScreen     = "sWaitScreen"
+	sError = "sError"
 )
 
 const (
 	eStarted       = "eStarted"
 	eCardDetected  = "eTagDetected"
-	eQRDetected    = "eQRDetected"
-	eCardRead      = "eCardRead"
-	eQRRead        = "eQRRead"
 	eCardValidated = "eCardValidated"
 	eQRValidated   = "eQRValidated"
-	// eErrorQR        = "eErrorQR"
-	// eErrorCardRead  = "eErrorCardRead"
-	// eErrorCardWrite = "eErrorCardWrite"
-	eScreenWait = "eScreenWait"
-	eStep       = "eStep"
+	eWait = "eWait"
+	eError       = "eError"
 )
 
 func beforeEvent(event string) string {
@@ -44,7 +37,7 @@ func leaveState(state string) string {
 	return fmt.Sprintf("leave_%s", state)
 }
 
-func newFSM(callbacks *fsm.Callbacks) *fsm.FSM {
+func (a *Actor)newFSM(callbacks *fsm.Callbacks) {
 
 	callbacksfsm := fsm.Callbacks{
 		"before_event": func(e *fsm.Event) {
@@ -62,6 +55,29 @@ func newFSM(callbacks *fsm.Callbacks) *fsm.FSM {
 		"enter_state": func(e *fsm.Event) {
 			log.Printf("FSM APP, state src: %s, state dst: %s", e.Src, e.Dst)
 		},
+		beforeEvent(eCardValidated): func(e *fsm.Event) {
+			a.inputs++
+			value := ""
+			if e.Args != nil && len(e.Args) > 0 {
+				if v, ok := e.Args[0].(float64)
+				value = fmt.Sprintf("$%.02f", v)
+			}
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+			a.ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: value})
+			
+		}
+		enterState(sDetectTag): func(e *fsm.Event) {	
+			a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+		},		
+		ebeforeEvent(eError): func(e *fsm.Event) {
+			if e.Args != nil && len(e.Args) > 0 {
+				if v, ok := e.Args[0].([]string) {
+					a.ctx.Send(a.pidGraph, &graph.MsgError{Value: v})
+				}
+			}	
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})		
+		}
+
 		// "leave_closed": func(e *fsm.Event) {
 		// },
 		// "before_verify": func(e *fsm.Event) {
@@ -78,22 +94,20 @@ func newFSM(callbacks *fsm.Callbacks) *fsm.FSM {
 		sStart,
 		fsm.Events{
 			{Name: eStarted, Src: []string{sStart}, Dst: sDetectTag},
-			{Name: eCardDetected, Src: []string{sDetectTag}, Dst: sReadCard},
-			{Name: eQRDetected, Src: []string{sDetectTag}, Dst: sReadQR},
-			{Name: eCardRead, Src: []string{sReadCard}, Dst: sValidationCard},
-			{Name: eCardValidated, Src: []string{sValidationCard}, Dst: sWriteCard},
-			{Name: eScreenWait, Src: []string{
-				sWriteCard,
+			{Name: eCardValidated, Src: []string{sDetectTag}, Dst: sValidationCard},
+			{Name: eQRValidated, Src: []string{sDetectTag}, Dst: sValidationQR},
+			{Name: eWait, Src: []string{
 				sValidationQR,
 				sValidationCard,
-			}, Dst: sWaitScreen},
+				sError,
+			}, Dst: sDetectTag},
 		},
 		callbacksfsm,
 	)
-	return rfsm
+	a.fmachine = rfsm
 }
 
-func RunFSM(f *fsm.FSM) {
+func (a *Actor)RunFSM() {
 
 	stepPending := false
 	// dataTag := make(map[string]interface{})
@@ -102,17 +116,26 @@ func RunFSM(f *fsm.FSM) {
 
 		switch f.Current() {
 		case sStart:
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+			a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
 		case sDetectTag:
-
-		case sReadCard:
-			if stepPending {
-				stepPending = false
-				f.Event(eStep)
-			}
-			f.Event(eCardDetected)
 		case sValidationCard:
-
+			if time.Now().Add(5 * time.Second).After(a.lastTime) {
+				a.fmachine.Event(eWait)
+				break
+			}
+		case sValidationQR:
+			if time.Now().Add(5 * time.Second).After(a.lastTime) {
+				a.fmachine.Event(eWait)
+				break
+			}
+		case sError:
+			if time.Now().Add(5 * time.Second).After(a.lastTime) {
+				a.fmachine.Event(eWait)
+				break
+			}
 		}
+		time.Sleep(300 * time.Millisecond)
 
 	}
 

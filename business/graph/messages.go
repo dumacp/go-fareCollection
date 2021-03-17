@@ -6,6 +6,9 @@ type MsgQrError struct{}
 type MsgBalanceError struct {
 	Value string
 }
+type MsgError struct {
+	Value []string
+}
 type MsgValidationTag struct {
 	Value string
 }
