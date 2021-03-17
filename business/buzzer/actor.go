@@ -22,7 +22,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if err := BuzzerInit(); err != nil {
 			logs.LogError.Println(err)
 			time.Sleep(3 * time.Second)
-			panic(err)
+			// panic(err)
 		}
 	case *MsgBuzzerGood:
 		BuzzerPlayGOOD()

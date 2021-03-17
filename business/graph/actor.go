@@ -19,6 +19,7 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
+	logs.LogBuild.Printf("%s - msg: %+v, type: %T", ctx.Self().GetId(), ctx.Message(), ctx.Message())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 		if err := pubsub.Init(); err != nil {

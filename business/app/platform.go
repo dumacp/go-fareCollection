@@ -34,11 +34,11 @@ const (
 		
 	},
 	"paymentMedium": {
-		"typeId": "b726d3b0-355c-4dcf-862e-277f4686f997",
-		"dataPreState": {
+		"typeId": "Card",
+		"dataPreState": {},
+		"dataPostState": {
 			"transactionId": %d
 		},
-		"dataPostState": {},
 		"externalSystemId": "b726d3b0-355c-4dcf-862e-277f4686f993"
 		
 	},

@@ -21,7 +21,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if err := PictoInit(); err != nil {
 			logs.LogError.Println(err)
 			time.Sleep(3 * time.Second)
-			panic(err)
+			// panic(err)
 		}
 	case *MsgPictoOK:
 		PictoFunc(PictogreenON)

@@ -4,6 +4,7 @@ type MsgTagDetected struct {
 	UID uint64
 }
 type MsgTagRead struct {
+	UID  uint64
 	Data map[string]interface{}
 }
 type MsgTagWriteError struct {

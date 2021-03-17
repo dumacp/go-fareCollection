@@ -1,21 +1,24 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/business/buzzer"
 	"github.com/dumacp/go-fareCollection/business/graph"
+	"github.com/dumacp/go-fareCollection/crosscutting/logs"
 	"github.com/looplab/fsm"
 )
 
 const (
-	sStart     = "sStart"
-	sDetectTag = "sDetectTag"
+	sStop           = "sStop"
+	sStart          = "sStart"
+	sDetectTag      = "sDetectTag"
 	sValidationCard = "sValidationCard"
 	sValidationQR   = "sValidationQR"
-	sError = "sError"
+	sError          = "sError"
 )
 
 const (
@@ -23,8 +26,8 @@ const (
 	eCardDetected  = "eTagDetected"
 	eCardValidated = "eCardValidated"
 	eQRValidated   = "eQRValidated"
-	eWait = "eWait"
-	eError       = "eError"
+	eWait          = "eWait"
+	eError         = "eError"
 )
 
 func beforeEvent(event string) string {
@@ -37,7 +40,7 @@ func leaveState(state string) string {
 	return fmt.Sprintf("leave_%s", state)
 }
 
-func (a *Actor)newFSM(callbacks *fsm.Callbacks) {
+func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 
 	callbacksfsm := fsm.Callbacks{
 		"before_event": func(e *fsm.Event) {
@@ -56,27 +59,29 @@ func (a *Actor)newFSM(callbacks *fsm.Callbacks) {
 			log.Printf("FSM APP, state src: %s, state dst: %s", e.Src, e.Dst)
 		},
 		beforeEvent(eCardValidated): func(e *fsm.Event) {
+			a.lastTime = time.Now()
 			a.inputs++
 			value := ""
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].(float64)
-				value = fmt.Sprintf("$%.02f", v)
+				if v, ok := e.Args[0].(float64); ok {
+					value = fmt.Sprintf("$%.02f", v)
+				}
 			}
 			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
 			a.ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: value})
-			
-		}
-		enterState(sDetectTag): func(e *fsm.Event) {	
+
+		},
+		enterState(sDetectTag): func(e *fsm.Event) {
 			a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-		},		
-		ebeforeEvent(eError): func(e *fsm.Event) {
+		},
+		beforeEvent(eError): func(e *fsm.Event) {
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].([]string) {
+				if v, ok := e.Args[0].([]string); ok {
 					a.ctx.Send(a.pidGraph, &graph.MsgError{Value: v})
 				}
-			}	
-			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})		
-		}
+			}
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
+		},
 
 		// "leave_closed": func(e *fsm.Event) {
 		// },
@@ -86,17 +91,18 @@ func (a *Actor)newFSM(callbacks *fsm.Callbacks) {
 		// },
 	}
 
-	for k, v := range *callbacks {
+	for k, v := range callbacks {
 		callbacksfsm[k] = v
 	}
 
 	rfsm := fsm.NewFSM(
-		sStart,
+		sStop,
 		fsm.Events{
-			{Name: eStarted, Src: []string{sStart}, Dst: sDetectTag},
+			{Name: eStarted, Src: []string{sStop}, Dst: sStart},
 			{Name: eCardValidated, Src: []string{sDetectTag}, Dst: sValidationCard},
 			{Name: eQRValidated, Src: []string{sDetectTag}, Dst: sValidationQR},
 			{Name: eWait, Src: []string{
+				sStart,
 				sValidationQR,
 				sValidationCard,
 				sError,
@@ -107,36 +113,67 @@ func (a *Actor)newFSM(callbacks *fsm.Callbacks) {
 	a.fmachine = rfsm
 }
 
-func (a *Actor)RunFSM() {
+func (a *Actor) RunFSM() {
 
-	stepPending := false
-	// dataTag := make(map[string]interface{})
+	f := a.fmachine
+	lastState := ""
 
 	for {
+		if err := func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					logs.LogError.Println("Recovered in \"startfsm() app\", ", r)
+					switch x := r.(type) {
+					case string:
+						err = errors.New(x)
+					case error:
+						err = x
+					default:
+						err = errors.New("Unknown panic")
+					}
+					time.Sleep(3 * time.Second)
+				}
+			}()
 
-		switch f.Current() {
-		case sStart:
-			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
-			a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-		case sDetectTag:
-		case sValidationCard:
-			if time.Now().Add(5 * time.Second).After(a.lastTime) {
-				a.fmachine.Event(eWait)
-				break
+			//TODO: change!!!
+			if f.Current() != sStop {
+				f.SetState(sStart)
 			}
-		case sValidationQR:
-			if time.Now().Add(5 * time.Second).After(a.lastTime) {
-				a.fmachine.Event(eWait)
-				break
+
+			for {
+
+				if lastState != f.Current() {
+					lastState = f.Current()
+					logs.LogBuild.Printf("current state app: %s", f.Current())
+				}
+
+				switch f.Current() {
+				case sStart:
+					a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+					a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+					f.Event(eWait)
+				case sDetectTag:
+				case sValidationCard:
+					if time.Now().Add(-5 * time.Second).After(a.lastTime) {
+						a.fmachine.Event(eWait)
+						break
+					}
+				case sValidationQR:
+					if time.Now().Add(5 * time.Second).After(a.lastTime) {
+						a.fmachine.Event(eWait)
+						break
+					}
+				case sError:
+					if time.Now().Add(5 * time.Second).After(a.lastTime) {
+						a.fmachine.Event(eWait)
+						break
+					}
+				}
+				time.Sleep(300 * time.Millisecond)
+
 			}
-		case sError:
-			if time.Now().Add(5 * time.Second).After(a.lastTime) {
-				a.fmachine.Event(eWait)
-				break
-			}
+		}(); err != nil {
+			logs.LogError.Println(err)
 		}
-		time.Sleep(300 * time.Millisecond)
-
 	}
-
 }
