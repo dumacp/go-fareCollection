@@ -13,3 +13,6 @@ type MsgTagWriteError struct {
 type MsgQRRead struct {
 	Data map[string]interface{}
 }
+type MsgNewRand struct {
+	Value int
+}

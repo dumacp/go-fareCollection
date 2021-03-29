@@ -26,6 +26,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgPictoOK:
 		PictoFunc(PictogreenON)
 		PictoFunc(PictoredOFF)
+	case *MsgPictoOFF:
+		PictoFunc(PictogreenOFF)
+		PictoFunc(PictoredOFF)
 	case *MsgPictoNotOK:
 		PictoFunc(PictogreenOFF)
 		PictoFunc(PictoredON)

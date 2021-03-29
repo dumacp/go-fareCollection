@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -12,7 +13,9 @@ const (
 	topicGraph = "GRAPH/app"
 )
 
-type Actor struct{}
+type Actor struct {
+	inputs int
+}
 
 func NewActor() actor.Actor {
 	return &Actor{}
@@ -30,18 +33,51 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgWaitTag:
 		screen1 := &Screen{
 			ID:  1,
-			Msg: []string{"presente medio\r\nde pago", `SIITP`},
+			Msg: []string{"presente medio\r\nde pago", `CUÑA CARIBE`},
 		}
-		sendMsg, err := funScreen(screen1)
+		sendMsg1, err := funScreen(screen1)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg1)
+		time.Sleep(100 * time.Millisecond)
+		ref1 := new(ReferenceApp)
+		ref1.Appversion = "V: "
+		ref1.Refproduct = "OMV-Z7-1431"
+		ref1.Appversion = fmt.Sprintf("%s%.02f", "V: ", 1.0)
+		// ref1.Count = a.inputs
+		sendMsg2, err := funRef(ref1)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg2)
+		time.Sleep(100 * time.Millisecond)
+		count1 := new(Countinputs)
+		count1.Count = a.inputs
+		sendMsg3, err := funCounts(count1)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg3)
+		time.Sleep(100 * time.Millisecond)
+	case *MsgValidationTag:
+		screen2 := &Screen{
+			ID:  2,
+			Msg: []string{`Saldo disponible`, msg.Value},
+		}
+		sendMsg, err := funScreen(screen2)
 		if err != nil {
 			logs.LogWarn.Println(err)
 			break
 		}
 		pubsub.Publish(topicGraph, sendMsg)
-	case *MsgValidationTag:
+	case *MsgValidationQR:
 		screen2 := &Screen{
 			ID:  2,
-			Msg: []string{`Saldo disponible`, msg.Value},
+			Msg: []string{`Ticket valido`, msg.Value},
 		}
 		sendMsg, err := funScreen(screen2)
 		if err != nil {
@@ -82,5 +118,33 @@ func (a *Actor) Receive(ctx actor.Context) {
 			break
 		}
 		pubsub.Publish(topicGraph, sendMsg)
+	case *MsgQrValue:
+		qrvalur := &Qrvalue{URL: msg.Value}
+		sendMsg, err := funQR(qrvalur)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg)
+	case *MsgCount:
+		a.inputs = msg.Value
+		// ref1 := new(ReferenceApp)
+		// ref1.Appversion = "V: "
+		// ref1.Refproduct = "OMV-Z7-1431"
+		// ref1.Appversion = fmt.Sprintf("%s%.02f", "V: ", 1.0)
+		// ref1.Count = msg.Value
+		// sendMsg1, err := funRef(ref1)
+		// if err != nil {
+		// 	logs.LogWarn.Println(err)
+		// 	break
+		// }
+		// pubsub.Publish(topicGraph, sendMsg1)
+		// counts := &Countinputs{Count: msg.Value}
+		// sendMsg2, err := funCounts(counts)
+		// if err != nil {
+		// 	logs.LogWarn.Println(err)
+		// 	break
+		// }
+		// pubsub.Publish(topicGraph, sendMsg2)
 	}
 }

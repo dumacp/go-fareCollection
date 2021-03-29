@@ -25,6 +25,7 @@ type Countinputs struct {
 type ReferenceApp struct {
 	Appversion string `json:"appversion"`
 	Refproduct string `json:"refproduct"`
+	// Count      int    `json:"count"`
 }
 
 type Qrvalue struct {

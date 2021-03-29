@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/crosscutting/logs"
@@ -15,6 +16,7 @@ import (
 )
 
 const (
+	urlQr        = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
 	url          = "https://sibus.nebulae.com.co/api/external-system-gateway/rest/collected-fare"
 	username     = "jhon.doe"
 	password     = "uno.2.tres"
@@ -23,15 +25,13 @@ const (
 	"id": "%s",
 	"endUser": {
 		"id": "6bec5233-4ffc-42fc-a7be-2730304d0929",
-		"name": "Daniel Tobon"
-		
+		"name": "%s"		
 	},
 	"fare": {
 		"farePolicyId": "5763c020-2ff0-4aa3-ad79-6f012e3a7e20",
 		"fareId": 22,
 		"fareType": "PLAIN",
-		"value":2000
-		
+		"value":2400		
 	},
 	"paymentMedium": {
 		"typeId": "Card",
@@ -39,18 +39,16 @@ const (
 		"dataPostState": {
 			"transactionId": %d
 		},
-		"externalSystemId": "b726d3b0-355c-4dcf-862e-277f4686f993"
-		
+		"externalSystemId": "b726d3b0-355c-4dcf-862e-277f4686f993"		
 	},
 	"terminal": {
 		"id": "b726d3b0-355c-4dcf-862e-277f4686f993",
 		"desc": "TTT",
 		"location": {
 			"type": "LOC",
-			"coordinates": %v,
+			"coordinates": %s,
 			"timestamp": %d
-		}
-		
+		}		
 	},
 	"timestamp":%d
 }`
@@ -60,8 +58,7 @@ const (
 		"farePolicyId": "5763c020-2ff0-4aa3-ad79-6f012e3a7e20",
 		"fareId": 22,
 		"fareType": "PLAIN",
-		"value": 2000
-	  
+		"value": 2400	  
 	},
 	"paymentMedium": {
 		"typeId": "QR",
@@ -70,58 +67,81 @@ const (
 		"dataPostState": {
 			"transactionId": %d
 		},
-		"externalSystemId": "b726d3b0-355c-4dcf-862e-277f4686f993"
-	  
+		"externalSystemId": "b726d3b0-355c-4dcf-862e-277f4686f993"	  
 	},
 	"terminal": {
 		"id": "b726d3b0-355c-4dcf-862e-277f4686f993",
 		"desc": "TTT",
 		"location": {
 			"type": "LOC",
-			"coordinates": %v,
+			"coordinates": %s,
 			"timestamp": %d
-		}
-	  
+		}	  
 	},
 	"timestamp": %d
 }`
 )
 
-var SendUsoQR = sendUso(templateQR)
-var SendUsoTAG = sendUso(templateTag)
-
-func sendUso(template string) func(name string, tid int, gps []float64, timeStamp time.Time) ([]byte, error) {
-
-	return func(name string, tid int, gps []float64, timeStamp time.Time) ([]byte, error) {
-
-		uid, err := uuid.NewUUID()
-		if err != nil {
-			return nil, err
-		}
-
-		jsonStr := []byte(fmt.Sprintf(template, uid, name, tid, gps, timeStamp.Nanosecond()/1000000))
-		logs.LogBuild.Printf("json: %s", jsonStr)
-
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.SetBasicAuth(username, password)
-
-		tr := loadLocalCert()
-		client := &http.Client{Transport: tr}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-
-		fmt.Println("response Status:", resp.Status)
-		fmt.Println("response Headers:", resp.Header)
-		return ioutil.ReadAll(resp.Body)
+func send(jsonStr []byte) ([]byte, error) {
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	if err != nil {
+		return nil, err
 	}
+	logs.LogBuild.Printf("json: %s", "test")
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(username, password)
+
+	tr := loadLocalCert()
+	client := &http.Client{Transport: tr}
+
+	var resp *http.Response
+	for range []int{1, 2, 3} {
+		resp, err = client.Do(req)
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		break
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// fmt.Println("response Status:", resp.Status)
+	// fmt.Println("response Headers:", resp.Header)
+	return ioutil.ReadAll(resp.Body)
+}
+
+func SendUsoTAG(name string, tid int, gps []float64, timeStamp time.Time) ([]byte, error) {
+
+	uid, err := uuid.NewUUID()
+	if err != nil {
+		return nil, err
+	}
+
+	ts := int64(timeStamp.UnixNano() / 1000000)
+
+	jsonStr := []byte(fmt.Sprintf(templateTag, uid, strings.Trim(name, "\x00"), tid, "[0.0, 0.0]", ts, ts))
+	logs.LogBuild.Printf("json: %s", jsonStr)
+
+	return send(jsonStr)
+
+}
+
+func SendUsoQR(tid int, gps []float64, timeStamp time.Time) ([]byte, error) {
+
+	uid, err := uuid.NewUUID()
+	if err != nil {
+		return nil, err
+	}
+	ts := int64(timeStamp.UnixNano() / 1000000)
+
+	jsonStr := []byte(fmt.Sprintf(templateQR, uid, tid, "[0.0, 0.0]", ts, ts))
+	logs.LogBuild.Printf("json: %s", jsonStr)
+
+	return send(jsonStr)
+
 }
 
 func loadLocalCert() *http.Transport {

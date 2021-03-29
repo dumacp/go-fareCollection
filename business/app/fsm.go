@@ -3,11 +3,11 @@ package app
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/business/buzzer"
 	"github.com/dumacp/go-fareCollection/business/graph"
+	"github.com/dumacp/go-fareCollection/business/picto"
 	"github.com/dumacp/go-fareCollection/crosscutting/logs"
 	"github.com/looplab/fsm"
 )
@@ -56,23 +56,42 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			}
 		},
 		"enter_state": func(e *fsm.Event) {
-			log.Printf("FSM APP, state src: %s, state dst: %s", e.Src, e.Dst)
+			logs.LogBuild.Printf("FSM APP, state src: %s, state dst: %s", e.Src, e.Dst)
 		},
 		beforeEvent(eCardValidated): func(e *fsm.Event) {
 			a.lastTime = time.Now()
 			a.inputs++
 			value := ""
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].(float64); ok {
-					value = fmt.Sprintf("$%.02f", v)
+				if v, ok := e.Args[0].(int32); ok {
+					// value = fmt.Sprintf("$%.02f", float64(v))
+					value = FormatSaldo(v)
 				}
 			}
 			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+			a.ctx.Send(a.pidPicto, &picto.MsgPictoOK{})
 			a.ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: value})
+			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
+
+		},
+		beforeEvent(eQRValidated): func(e *fsm.Event) {
+			a.lastTime = time.Now()
+			a.inputs++
+			value := ""
+			if e.Args != nil && len(e.Args) > 0 {
+				if v, ok := e.Args[0].(string); ok {
+					value = v
+				}
+			}
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+			a.ctx.Send(a.pidPicto, &picto.MsgPictoOK{})
+			a.ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: value})
+			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
 
 		},
 		enterState(sDetectTag): func(e *fsm.Event) {
 			a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+			a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
 		},
 		beforeEvent(eError): func(e *fsm.Event) {
 			if e.Args != nil && len(e.Args) > 0 {
@@ -80,6 +99,7 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 					a.ctx.Send(a.pidGraph, &graph.MsgError{Value: v})
 				}
 			}
+			a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
 			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
 		},
 
@@ -159,7 +179,7 @@ func (a *Actor) RunFSM() {
 						break
 					}
 				case sValidationQR:
-					if time.Now().Add(5 * time.Second).After(a.lastTime) {
+					if time.Now().Add(-5 * time.Second).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}

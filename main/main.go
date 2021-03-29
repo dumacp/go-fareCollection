@@ -14,13 +14,18 @@ import (
 )
 
 var debug bool
+var logstd bool
 
 func init() {
 	flag.BoolVar(&debug, "debug", false, "debug?")
+	flag.BoolVar(&logstd, "logStd", false, "logs in stderr?")
 }
 
 func main() {
 	flag.Parse()
+	initLogs(debug, logstd)
+
+	logs.LogBuild.Println("debug log")
 
 	ctx := actor.EmptyRootContext
 
