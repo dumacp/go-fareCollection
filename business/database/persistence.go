@@ -13,7 +13,7 @@ type Data struct {
 	Payload   []byte
 }
 
-func newDB(path string) (*bbolt.DB, error) {
+func OpenDB(path string) (*bbolt.DB, error) {
 	db, err := bbolt.Open(path, 0664, bbolt.DefaultOptions)
 	if err != nil {
 		return nil, err

@@ -3,8 +3,15 @@ package database
 import "time"
 
 type MsgPersistData struct {
-	ID        int64
+	ID        string
 	Data      []byte
+	Indexes   []string
 	TimeStamp time.Time
 	Database  string
+}
+
+type MsgAckPersistData struct {
+	ID     string
+	Succes bool
+	Error  string
 }
