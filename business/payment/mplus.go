@@ -1,15 +1,37 @@
-package app
+package payment
 
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"time"
 )
+
+// type Cardv1 interface {
+// 	Name() string
+// 	DocID() string
+// 	CardID() int
+// 	Perfil() int
+// 	Version() int
+// 	PMR() int
+// 	AC() int
+// 	Bloqueo() bool
+// 	FechaBloque() time.Time
+// 	Saldo() int
+// 	saldoBackup() int
+// 	Seq() int
+// 	FechaRecarga() time.Time
+// 	SeqRecarga() int
+// 	ValorRecarga() int
+// 	TipoRecarga()
+// 	FechaValidez() time.Time
+// }
 
 const (
 	cost = 2400
 )
 
-func ValidationTag(tag map[string]interface{}) (map[string]interface{}, error) {
+func ValidationTag(tag map[string]interface{}, ruta int) (map[string]interface{}, error) {
 
 	saldo1, ok := tag["saldo"]
 	if !ok {
@@ -41,6 +63,25 @@ func ValidationTag(tag map[string]interface{}) (map[string]interface{}, error) {
 	newTag["seq"] = v
 	return newTag, nil
 }
-func ValidationQr(tag map[string]interface{}) error {
-	return nil
+
+type hist struct {
+	date       time.Time
+	valor      int
+	devID      int
+	route      int
+	perfil     int
+	seq        int
+	walletType int
+}
+
+func sortHistory(tag map[string]interface{}) ([]*hist, error) {
+
+	re, err := regexp.Compile(`hits[0-9]`)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range tag {
+		re.
+	}
+	return nil, nil
 }

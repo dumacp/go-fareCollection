@@ -11,6 +11,7 @@ import (
 	appreader "github.com/dumacp/go-appliance-contactless/business/app"
 	"github.com/dumacp/go-fareCollection/business/buzzer"
 	"github.com/dumacp/go-fareCollection/business/graph"
+	"github.com/dumacp/go-fareCollection/business/payment"
 	"github.com/dumacp/go-fareCollection/business/picto"
 	"github.com/dumacp/go-fareCollection/business/qr"
 	"github.com/dumacp/go-fareCollection/crosscutting/logs"
@@ -115,13 +116,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 			for k, v := range msg.Map {
 				a.mcard[k] = v
 			}
-			v, err := ValidationTag(a.mcard)
+			v, err := payment.ValidationTag(a.mcard, 0)
 			if err != nil {
 				logs.LogBuild.Println(err)
-				if errors.Is(err, ErrorBalance) {
+				if errors.Is(err, payment.ErrorBalance) {
 					//Send Msg Error Balance
 
-					if balanceErr, ok := err.(*ErrorBalanceValue); ok {
+					if balanceErr, ok := err.(*payment.ErrorBalanceValue); ok {
 						ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: fmt.Sprintf("%.02f", balanceErr.Balance)})
 					} else {
 						ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: ""})
@@ -156,24 +157,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			logs.LogInfo.Printf("response platform: %s", response)
 		}()
-	case *MsgQRRead:
-		if err := func() error {
-			if a.actualTag == a.errorWriteTag {
-				//Commit Tag
-				return nil
-			}
-			if err := ValidationQr(msg.Data); err != nil {
-				if errors.Is(err, ErrorQR) {
-					//Send Msg Error Balance
-					defer ctx.Send(nil, nil)
-				}
-				time.Sleep(3 * time.Second)
-				return err
-			}
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
 	case *MsgTagWriteError:
 		if err := func() error {
 			//Send Msg Write error
