@@ -14,6 +14,7 @@ type UsoTransport struct {
 	History      []*UsoTransport
 }
 
-func NewUso(accountID, paymentID, routeID int) (*UsoTransport, error) {
+func NewUso() (*UsoTransport, error) {
+
 	return nil, nil
 }

@@ -141,3 +141,20 @@ func Get(db *bbolt.DB, databaseName string, id string) ([]byte, error) {
 	}
 	return result, nil
 }
+
+type QueryFilter struct {
+	Indexes    []string
+	BeforeFrom *time.Time
+	AfterFrom  *time.Time
+}
+
+func Query(db *bbolt.DB, databaseName string, queryFilter *QueryFilter, funcFilter func(v interface{})) ([]byte, error) {
+
+	// var d1 []byte
+	// var d2 []byte
+	// if queryFilter.BeforeFrom != nil {
+	// d1 = []byte(queryFilter.BeforeFrom.Format("2006-01"))
+	// }
+
+	return nil, nil
+}
