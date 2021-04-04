@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"time"
 )
 
@@ -64,24 +65,54 @@ func ValidationTag(tag map[string]interface{}, ruta int) (map[string]interface{}
 	return newTag, nil
 }
 
-type hist struct {
-	date       time.Time
-	valor      int
-	devID      int
-	route      int
-	perfil     int
-	seq        int
-	walletType int
+type Hist struct {
+	Index      int
+	Date       time.Time
+	Valor      int
+	DevID      int
+	Route      int
+	Perfil     int
+	Seq        int
+	WalletType int
 }
 
-func sortHistory(tag map[string]interface{}) ([]*hist, error) {
+func History(tag map[string]interface{}) ([]*Hist, error) {
 
-	re, err := regexp.Compile(`hits[0-9]`)
+	re, err := regexp.Compile(`hits([0-9])_(.+)`)
 	if err != nil {
 		return nil, err
 	}
+	hists := make(map[string]*Hist)
 	for k, v := range tag {
-		re.
+		res := re.FindStringSubmatch(k)
+		if len(res) > 2 && len(res[2]) > 0 {
+			ind := res[1]
+			key := res[2]
+			if _, ok := hists[ind]; !ok {
+				hists[ind] = &Hist{}
+			}
+			switch key {
+			case "time":
+				hists[ind].Date = time.Unix(int64(v.(uint32)), int64(0))
+			case "valor":
+				hists[ind].Valor = int(v.(int32))
+			case "iddev":
+				hists[ind].DevID = int(v.(uint32))
+			case "ruta":
+				hists[ind].Route = int(v.(uint32))
+			case "seqi":
+				hists[ind].Seq = int(v.(uint16))
+			case "wallett":
+				hists[ind].WalletType = int(v.(uint16))
+			}
+		}
 	}
-	return nil, nil
+
+	result := make([]*Hist, 0)
+	for _, v := range hists {
+		result = append(result, v)
+	}
+
+	sort.SliceStable(result, func(i, j int) bool { return result[i].Date.Before(result[j].Date) })
+	return result, nil
 }
