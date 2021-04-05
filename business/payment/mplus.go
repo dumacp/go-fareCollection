@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"time"
+
+	"github.com/dumacp/go-fareCollection/crosscutting/logs"
 )
 
 // type Cardv1 interface {
@@ -32,7 +35,7 @@ const (
 	cost = 2400
 )
 
-func ValidationTag(tag map[string]interface{}, ruta int) (map[string]interface{}, error) {
+func ValidationTag(tag map[string]interface{}, ruta int, devID int) (map[string]interface{}, error) {
 
 	saldo1, ok := tag["saldo"]
 	if !ok {
@@ -62,6 +65,30 @@ func ValidationTag(tag map[string]interface{}, ruta int) (map[string]interface{}
 
 	v := tag["seq"].(int32) + 1
 	newTag["seq"] = v
+
+	hist, err := History(tag)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range hist {
+		logs.LogBuild.Printf("map hist: %+v", v)
+	}
+	if len(hist) < 1 {
+		return nil, errors.New("hist error")
+	}
+
+	hist[0].Date = time.Now()
+	hist[0].DevID = devID
+	hist[0].Perfil = 0
+	hist[0].Route = ruta
+	hist[0].Seq = 0
+	hist[0].Valor = cost
+	hist[0].WalletType = 1
+
+	for k, v := range hist[0].ToMapping() {
+		newTag[k] = v
+	}
+
 	return newTag, nil
 }
 
@@ -76,9 +103,25 @@ type Hist struct {
 	WalletType int
 }
 
+func (h *Hist) ToMapping() map[string]interface{} {
+
+	prefix := fmt.Sprintf("hist%d_", h.Index)
+
+	mapp := make(map[string]interface{})
+	mapp[fmt.Sprintf("%s%s", prefix, "time")] = uint32(h.Date.Unix())
+	mapp[fmt.Sprintf("%s%s", prefix, "valor")] = int32(h.Valor)
+	mapp[fmt.Sprintf("%s%s", prefix, "iddev")] = uint32(h.DevID)
+	mapp[fmt.Sprintf("%s%s", prefix, "ruta")] = uint32(h.Route)
+	mapp[fmt.Sprintf("%s%s", prefix, "perfil")] = uint16(h.Perfil)
+	mapp[fmt.Sprintf("%s%s", prefix, "seqi")] = uint16(h.Seq)
+	mapp[fmt.Sprintf("%s%s", prefix, "wallett")] = uint16(h.WalletType)
+
+	return mapp
+}
+
 func History(tag map[string]interface{}) ([]*Hist, error) {
 
-	re, err := regexp.Compile(`hits([0-9])_(.+)`)
+	re, err := regexp.Compile(`hist([0-9])_(.+)`)
 	if err != nil {
 		return nil, err
 	}
@@ -86,10 +129,12 @@ func History(tag map[string]interface{}) ([]*Hist, error) {
 	for k, v := range tag {
 		res := re.FindStringSubmatch(k)
 		if len(res) > 2 && len(res[2]) > 0 {
+			// logs.LogBuild.Printf("regexp hist: %v", res)
 			ind := res[1]
 			key := res[2]
 			if _, ok := hists[ind]; !ok {
-				hists[ind] = &Hist{}
+				indx, _ := strconv.Atoi(ind)
+				hists[ind] = &Hist{Index: indx}
 			}
 			switch key {
 			case "time":

@@ -33,6 +33,7 @@ type Actor struct {
 	lastTime       time.Time
 	ctx            actor.Context
 	mcard          map[string]interface{}
+	updates        map[string]interface{}
 	chNewRand      chan int
 	lastRand       int
 	actualRand     int
@@ -103,7 +104,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 			logs.LogError.Println(err)
 		}
 	case *appreader.MsgCardRead:
-		logs.LogBuild.Printf("tag read: %v", msg.Map)
+
+		jsonprint, err := json.MarshalIndent(msg.Map, "", "  ")
+		if err != nil {
+			logs.LogError.Println(err)
+		}
+		logs.LogBuild.Printf("tag read: %s", jsonprint)
 		if err := func() error {
 			// if a.actualTag == a.errorWriteTag {
 			// 	//Commit Tag
@@ -116,7 +122,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			for k, v := range msg.Map {
 				a.mcard[k] = v
 			}
-			v, err := payment.ValidationTag(a.mcard, 0)
+			v, err := payment.ValidationTag(a.mcard, 1028, 1290)
 			if err != nil {
 				logs.LogBuild.Println(err)
 				if errors.Is(err, payment.ErrorBalance) {
@@ -133,6 +139,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				time.Sleep(3 * time.Second)
 				return err
 			}
+			a.updates = v
 			ctx.Send(ctx.Sender(), &appreader.MsgWriteCard{UID: msg.UID, Updates: v})
 			return nil
 		}(); err != nil {
@@ -150,7 +157,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if !ok {
 				logs.LogError.Println("\"name\" is not STRING")
 			}
-			response, err := SendUsoTAG(name, int(tID), []float64{0, 0}, time.Now())
+			card := make(map[string]interface{})
+			for k, v := range a.mcard {
+				card[k] = v
+			}
+			for k, v := range a.updates {
+				card[k] = v
+			}
+			response, err := SendUsoTAG(name, int(tID+1), card, a.mcard, []float64{0, 0}, time.Now())
 			if err != nil {
 				logs.LogError.Printf("QR error: %s", err)
 				return

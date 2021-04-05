@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	urlQr        = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
-	url          = "https://sibus.nebulae.com.co/api/external-system-gateway/rest/collected-fare"
+	// urlQr        = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
+	urlQr        = `tinyurl.com/SITIRIO?r=16&d=OMV-Z7-1431&p=%d`
+	url          = "https://sitirio.somosmovilidad.gov.co/api/external-system-gateway/rest/collected-fare"
 	username     = "jhon.doe"
 	password     = "uno.2.tres"
 	localCertDir = "/usr/local/share/ca-certificates/"
@@ -35,9 +37,12 @@ const (
 	},
 	"paymentMedium": {
 		"typeId": "Card",
-		"dataPreState": {},
+		"dataPreState": {
+			"beforeWrite": %s
+		},
 		"dataPostState": {
-			"transactionId": %d
+			"transactionId": %d,
+			"afterWrite": %s
 		},
 		"externalSystemId": "b726d3b0-355c-4dcf-862e-277f4686f993"		
 	},
@@ -113,7 +118,7 @@ func send(jsonStr []byte) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func SendUsoTAG(name string, tid int, gps []float64, timeStamp time.Time) ([]byte, error) {
+func SendUsoTAG(name string, tid int, newtag map[string]interface{}, tag map[string]interface{}, gps []float64, timeStamp time.Time) ([]byte, error) {
 
 	uid, err := uuid.NewUUID()
 	if err != nil {
@@ -122,7 +127,10 @@ func SendUsoTAG(name string, tid int, gps []float64, timeStamp time.Time) ([]byt
 
 	ts := int64(timeStamp.UnixNano() / 1000000)
 
-	jsonStr := []byte(fmt.Sprintf(templateTag, uid, strings.Trim(name, "\x00"), tid, "[0.0, 0.0]", ts, ts))
+	beforeTag, _ := json.Marshal(tag)
+	afterTag, _ := json.Marshal(newtag)
+
+	jsonStr := []byte(fmt.Sprintf(templateTag, uid, strings.Trim(name, "\x00"), beforeTag, tid, afterTag, "[0.0, 0.0]", ts, ts))
 	logs.LogBuild.Printf("json: %s", jsonStr)
 
 	return send(jsonStr)
