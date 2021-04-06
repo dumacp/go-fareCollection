@@ -33,7 +33,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgWaitTag:
 		screen1 := &Screen{
 			ID:  1,
-			Msg: []string{"presente medio\r\nde pago", `CUÑA CARIBE`},
+			Msg: []string{"presente medio\r\nde pago", `TRONCAL 1`},
 		}
 		sendMsg1, err := funScreen(screen1)
 		if err != nil {
@@ -77,7 +77,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgValidationQR:
 		screen2 := &Screen{
 			ID:  2,
-			Msg: []string{`Ticket valido`, msg.Value},
+			Msg: []string{`Ticket válido`, msg.Value},
 		}
 		sendMsg, err := funScreen(screen2)
 		if err != nil {

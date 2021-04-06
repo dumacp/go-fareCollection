@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"container/list"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -26,7 +27,7 @@ const (
 	templateTag  = `{
 	"id": "%s",
 	"endUser": {
-		"id": "6bec5233-4ffc-42fc-a7be-2730304d0929",
+		"id": "%s",
 		"name": "%s"		
 	},
 	"fare": {
@@ -98,12 +99,14 @@ func send(jsonStr []byte) ([]byte, error) {
 
 	tr := loadLocalCert()
 	client := &http.Client{Transport: tr}
+	client.Timeout = 10 * time.Second
 
 	var resp *http.Response
-	for range []int{1, 2, 3} {
+	rangex := make([]int, 3)
+	for range rangex {
 		resp, err = client.Do(req)
 		if err != nil {
-			time.Sleep(1 * time.Second)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 		break
@@ -118,11 +121,15 @@ func send(jsonStr []byte) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func SendUsoTAG(name string, tid int, newtag map[string]interface{}, tag map[string]interface{}, gps []float64, timeStamp time.Time) ([]byte, error) {
+//TODO: remove queue RAM
+var queueSend = list.New()
+
+func SendUsoTAG(name string, tid int, newtag map[string]interface{}, tag map[string]interface{}, gps []float64, timeStamp time.Time) {
 
 	uid, err := uuid.NewUUID()
 	if err != nil {
-		return nil, err
+		logs.LogError.Println(err)
+		return
 	}
 
 	ts := int64(timeStamp.UnixNano() / 1000000)
@@ -130,25 +137,108 @@ func SendUsoTAG(name string, tid int, newtag map[string]interface{}, tag map[str
 	beforeTag, _ := json.Marshal(tag)
 	afterTag, _ := json.Marshal(newtag)
 
-	jsonStr := []byte(fmt.Sprintf(templateTag, uid, strings.Trim(name, "\x00"), beforeTag, tid, afterTag, "[0.0, 0.0]", ts, ts))
+	jsonStr := []byte(fmt.Sprintf(templateTag, uid, uid, strings.Trim(name, "\x00"), beforeTag, tid, afterTag, "[0.0, 0.0]", ts, ts))
 	logs.LogBuild.Printf("json: %s", jsonStr)
 
-	return send(jsonStr)
+	el := queueSend.PushBack(jsonStr)
+
+	// result, err := send(jsonStr)
+	// if err != nil {
+	// 	logs.LogWarn.Printf("POST result: %s; Error: %s", result, err)
+	// 	return
+	// }
+	// logs.LogInfo.Printf("POST result: %s", result)
+	// el := last.Prev()
+	// queueSend.Remove(last)
+
+	// if el == nil {
+	// 	return
+	// }
+	for {
+		prev := el.Prev()
+		value, ok := el.Value.([]byte)
+		if !ok {
+			queueSend.Remove(el)
+			el = prev
+			if prev == nil {
+				break
+			}
+			continue
+		}
+		result, err := send(value)
+		if err != nil {
+			logs.LogWarn.Printf("POST Error: %s", err)
+			logs.LogWarn.Printf("POST result: %s", result)
+			return
+		}
+		logs.LogInfo.Printf("POST result: %s", result)
+
+		queueSend.Remove(el)
+		el = prev
+		if prev == nil {
+			break
+		}
+	}
+
+	return
 
 }
 
-func SendUsoQR(tid int, gps []float64, timeStamp time.Time) ([]byte, error) {
+func SendUsoQR(tid int, gps []float64, timeStamp time.Time) {
 
 	uid, err := uuid.NewUUID()
 	if err != nil {
-		return nil, err
+		logs.LogError.Println(err)
+		return
+		// return nil, err
 	}
 	ts := int64(timeStamp.UnixNano() / 1000000)
 
 	jsonStr := []byte(fmt.Sprintf(templateQR, uid, tid, "[0.0, 0.0]", ts, ts))
 	logs.LogBuild.Printf("json: %s", jsonStr)
 
-	return send(jsonStr)
+	// return send(jsonStr)
+
+	el := queueSend.PushBack(jsonStr)
+
+	// result, err := send(jsonStr)
+	// if err != nil {
+	// 	logs.LogWarn.Printf("POST result: %s; Error: %s", result, err)
+	// 	return
+	// }
+	// logs.LogInfo.Printf("POST result: %s", result)
+	// el := last.Prev()
+	// queueSend.Remove(last)
+
+	// if el == nil {
+	// 	return
+	// }
+	for {
+		prev := el.Prev()
+		value, ok := el.Value.([]byte)
+		if !ok {
+			queueSend.Remove(el)
+			el = prev
+			if prev == nil {
+				break
+			}
+			continue
+		}
+		result, err := send(value)
+		if err != nil {
+			logs.LogWarn.Printf("POST result: %s; Error: %s", result, err)
+			return
+		}
+		logs.LogInfo.Printf("POST result: %s", result)
+
+		queueSend.Remove(el)
+		el = prev
+		if prev == nil {
+			break
+		}
+	}
+
+	return
 
 }
 

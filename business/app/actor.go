@@ -74,13 +74,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return err
 			}
 			a.pidPicto = pidPicto
-			// propsQR := actor.PropsFromProducer(qr.NewActor)
-			// pidQR, err := ctx.SpawnNamed(propsQR, "qr-actor")
-			// if err != nil {
-			// 	time.Sleep(3 * time.Second)
-			// 	return err
-			// }
-			// a.pidQR = pidQR
+			propsQR := actor.PropsFromProducer(qr.NewActor)
+			pidQR, err := ctx.SpawnNamed(propsQR, "qr-actor")
+			if err != nil {
+				time.Sleep(3 * time.Second)
+				return err
+			}
+			a.pidQR = pidQR
 			return nil
 		}(); err != nil {
 			logs.LogError.Println(err)
@@ -164,12 +164,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 			for k, v := range a.updates {
 				card[k] = v
 			}
-			response, err := SendUsoTAG(name, int(tID+1), card, a.mcard, []float64{0, 0}, time.Now())
-			if err != nil {
-				logs.LogError.Printf("QR error: %s", err)
-				return
-			}
-			logs.LogInfo.Printf("response platform: %s", response)
+			// go func() {
+			SendUsoTAG(name, int(tID+1), card, a.mcard, []float64{0, 0}, time.Now())
+			// if err != nil {
+			// 	logs.LogError.Printf("POST error: %s", err)
+			// 	return
+			// }
+			// logs.LogInfo.Printf("response platform: %s", response)
+			// }()
 		}()
 	case *MsgTagWriteError:
 		if err := func() error {
@@ -226,14 +228,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.lastRand = a.actualRand
 		a.actualRand = -1
 
-		go func() {
-			response, err := SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
-			if err != nil {
-				logs.LogError.Printf("QR error: %s", err)
-				return
-			}
-			logs.LogInfo.Printf("response platform: %s", response)
-		}()
+		// go func() {
+		SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
+		// 	if err != nil {
+		// 		logs.LogError.Printf("POST error: %s", err)
+		// 		return
+		// 	}
+		// 	logs.LogInfo.Printf("response platform: %s", response)
+		// }()
 
 	case *MsgNewRand:
 		a.lastRand = a.actualRand
