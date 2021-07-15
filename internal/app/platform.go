@@ -13,14 +13,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/google/uuid"
+)
+
+var (
+	urlQr = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
+	url   = "https://sibus.nebulae.com.co/api/external-system-gateway/rest/collected-fare"
 )
 
 const (
 	// urlQr        = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
-	urlQr        = `tinyurl.com/SITIRIO?r=16&d=OMV-Z7-1431&p=%d`
-	url          = "https://sitirio.somosmovilidad.gov.co/api/external-system-gateway/rest/collected-fare"
+	// urlQr        = `tinyurl.com/SITIRIO?r=16&d=OMV-Z7-1431&p=%d`
+	// url          = "https://sitirio.somosmovilidad.gov.co/api/external-system-gateway/rest/collected-fare"
 	username     = "jhon.doe"
 	password     = "uno.2.tres"
 	localCertDir = "/usr/local/share/ca-certificates/"

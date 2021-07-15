@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	svc "github.com/dumacp/go-fareCollection/business/services"
-	"github.com/dumacp/go-fareCollection/crosscutting/comm/pubsub"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-fareCollection/internal/comm/pubsub"
+	svc "github.com/dumacp/go-fareCollection/internal/services"
 	"github.com/dumacp/go-fareCollection/messages"
 	"github.com/dumacp/go-fareCollection/services"
+	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 //Gateway interface

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 // type Cardv1 interface {

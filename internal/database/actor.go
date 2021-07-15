@@ -2,8 +2,8 @@ package database
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
-	"github.com/etcd-io/bbolt"
+	"github.com/dumacp/go-logs/pkg/logs"
+	"go.etcd.io/bbolt"
 )
 
 type Actor struct {

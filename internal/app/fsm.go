@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dumacp/go-fareCollection/business/buzzer"
-	"github.com/dumacp/go-fareCollection/business/graph"
-	"github.com/dumacp/go-fareCollection/business/picto"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-fareCollection/internal/buzzer"
+	"github.com/dumacp/go-fareCollection/internal/graph"
+	"github.com/dumacp/go-fareCollection/internal/picto"
+	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
 )
 
@@ -121,6 +121,7 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			{Name: eStarted, Src: []string{sStop}, Dst: sStart},
 			{Name: eCardValidated, Src: []string{sDetectTag}, Dst: sValidationCard},
 			{Name: eQRValidated, Src: []string{sDetectTag}, Dst: sValidationQR},
+			{Name: eError, Src: []string{sDetectTag}, Dst: sError},
 			{Name: eWait, Src: []string{
 				sStart,
 				sValidationQR,

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/dumacp/go-fareCollection/crosscutting/comm/pubsub"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-fareCollection/internal/comm/pubsub"
+	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 const (

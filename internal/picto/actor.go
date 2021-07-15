@@ -1,10 +1,10 @@
-package buzzer
+package picto
 
 import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 type Actor struct {
@@ -18,15 +18,19 @@ func (a *Actor) Receive(ctx actor.Context) {
 	switch ctx.Message().(type) {
 
 	case *actor.Started:
-
-		if err := BuzzerInit(); err != nil {
+		if err := PictoInit(); err != nil {
 			logs.LogError.Println(err)
 			time.Sleep(3 * time.Second)
 			// panic(err)
 		}
-	case *MsgBuzzerGood:
-		BuzzerPlayGOOD()
-	case *MsgBuzzerBad:
-		BuzzerPlayBAD()
+	case *MsgPictoOK:
+		PictoFunc(PictogreenON)
+		PictoFunc(PictoredOFF)
+	case *MsgPictoOFF:
+		PictoFunc(PictogreenOFF)
+		PictoFunc(PictoredOFF)
+	case *MsgPictoNotOK:
+		PictoFunc(PictogreenOFF)
+		PictoFunc(PictoredON)
 	}
 }

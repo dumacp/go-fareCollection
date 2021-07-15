@@ -4,13 +4,12 @@ import (
 	"bufio"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
 	"github.com/tarm/serial"
 )
@@ -35,15 +34,15 @@ const (
 	eError   = "eError"
 )
 
-func beforeEvent(event string) string {
-	return fmt.Sprintf("before_%s", event)
-}
-func enterState(state string) string {
-	return fmt.Sprintf("enter_%s", state)
-}
-func leaveState(state string) string {
-	return fmt.Sprintf("leave_%s", state)
-}
+// func beforeEvent(event string) string {
+// 	return fmt.Sprintf("before_%s", event)
+// }
+// func enterState(state string) string {
+// 	return fmt.Sprintf("enter_%s", state)
+// }
+// func leaveState(state string) string {
+// 	return fmt.Sprintf("leave_%s", state)
+// }
 
 func NewFSM(callbacks fsm.Callbacks) *fsm.FSM {
 
@@ -88,7 +87,7 @@ func NewFSM(callbacks fsm.Callbacks) *fsm.FSM {
 	return rfsm
 }
 
-func RunFSM(ctx *actor.Context, chQuit chan int, f *fsm.FSM) {
+func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 
 	if err := func() (errr error) {
 		defer func() {
@@ -100,7 +99,7 @@ func RunFSM(ctx *actor.Context, chQuit chan int, f *fsm.FSM) {
 				case error:
 					errr = x
 				default:
-					errr = errors.New("Unknown panic")
+					errr = errors.New("unknown panic")
 				}
 			}
 		}()
@@ -114,7 +113,7 @@ func RunFSM(ctx *actor.Context, chQuit chan int, f *fsm.FSM) {
 		for {
 
 			select {
-			case _, _ = <-chQuit:
+			case <-chQuit:
 				return nil
 			default:
 			}
@@ -173,7 +172,7 @@ func RunFSM(ctx *actor.Context, chQuit chan int, f *fsm.FSM) {
 					logs.LogWarn.Printf("QR error: %s", err)
 					break
 				}
-				(*ctx).Send((*ctx).Self(), &MsgNewCodeQR{Value: data})
+				ctx.Send(ctx.Self(), &MsgNewCodeQR{Value: data})
 			case sClose:
 			}
 			time.Sleep(10 * time.Millisecond)

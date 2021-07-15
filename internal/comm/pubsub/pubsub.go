@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
 	"github.com/dumacp/go-fareCollection/messages"
+	"github.com/dumacp/go-logs/pkg/logs"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -47,7 +47,7 @@ func getInstance() *pubsubActor {
 		instance = &pubsubActor{}
 		instance.mux = sync.Mutex{}
 		instance.subscriptions = make(map[string]*subscribeMSG)
-		ctx := actor.EmptyRootContext
+		ctx := actor.NewActorSystem().Root
 		props := actor.PropsFromFunc(instance.Receive)
 		_, err := ctx.SpawnNamed(props, "pubsub-actor")
 		if err != nil {

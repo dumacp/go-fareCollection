@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"github.com/AsynkronIT/protoactor-go/actor"
-	svc "github.com/dumacp/go-fareCollection/business/services"
+	svc "github.com/dumacp/go-fareCollection/internal/services"
 	"github.com/dumacp/go-fareCollection/messages"
 	"github.com/dumacp/go-fareCollection/services"
 )

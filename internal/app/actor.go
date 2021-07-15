@@ -8,42 +8,42 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	appreader "github.com/dumacp/go-appliance-contactless/business/app"
-	"github.com/dumacp/go-fareCollection/business/buzzer"
-	"github.com/dumacp/go-fareCollection/business/graph"
-	"github.com/dumacp/go-fareCollection/business/payment"
-	"github.com/dumacp/go-fareCollection/business/picto"
-	"github.com/dumacp/go-fareCollection/business/qr"
-	"github.com/dumacp/go-fareCollection/crosscutting/logs"
+	readermessages "github.com/dumacp/go-appliance-contactless/pkg/messages"
+	"github.com/dumacp/go-fareCollection/internal/buzzer"
+	"github.com/dumacp/go-fareCollection/internal/graph"
+	"github.com/dumacp/go-fareCollection/internal/payment"
+	"github.com/dumacp/go-fareCollection/internal/picto"
+	"github.com/dumacp/go-fareCollection/internal/qr"
+	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
 )
 
 type Actor struct {
-	lastTag        uint64
-	lastTimeDetect time.Time
-	errorWriteTag  uint64
-	actualTag      uint64
-	pidGraph       *actor.PID
-	pidBuzzer      *actor.PID
-	pidPicto       *actor.PID
-	pidReader      *actor.PID
-	pidQR          *actor.PID
-	inputs         int
-	fmachine       *fsm.FSM
-	lastTime       time.Time
-	ctx            actor.Context
-	mcard          map[string]interface{}
-	updates        map[string]interface{}
-	chNewRand      chan int
-	lastRand       int
-	actualRand     int
+	// lastTag        uint64
+	// lastTimeDetect time.Time
+	// errorWriteTag  uint64
+	// actualTag      uint64
+	pidGraph   *actor.PID
+	pidBuzzer  *actor.PID
+	pidPicto   *actor.PID
+	pidReader  *actor.PID
+	pidQR      *actor.PID
+	inputs     int
+	fmachine   *fsm.FSM
+	lastTime   time.Time
+	ctx        actor.Context
+	mcard      map[string]interface{}
+	updates    map[string]interface{}
+	chNewRand  chan int
+	lastRand   int
+	actualRand int
 }
 
 func NewActor() actor.Actor {
 	a := &Actor{}
 	a.newFSM(nil)
 	go a.RunFSM()
-	a.chNewRand = make(chan int, 0)
+	a.chNewRand = make(chan int)
 	go a.TickQR(a.chNewRand)
 	return a
 }
@@ -89,21 +89,21 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		a.fmachine.Event(eStarted)
 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-	case *MsgTagDetected:
-		if err := func() error {
-			if a.actualTag == a.lastTag {
-				if a.lastTimeDetect.Before(time.Now().Add(-5 * time.Second)) {
-					return nil
-				}
-			}
-			//read card
-			ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-			a.lastTag = msg.UID
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
-	case *appreader.MsgCardRead:
+	// case *MsgTagDetected:
+	// 	if err := func() error {
+	// 		if a.actualTag == a.lastTag {
+	// 			if a.lastTimeDetect.Before(time.Now().Add(-5 * time.Second)) {
+	// 				return nil
+	// 			}
+	// 		}
+	// 		//read card
+	// 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+	// 		a.lastTag = msg.UID
+	// 		return nil
+	// 	}(); err != nil {
+	// 		logs.LogError.Println(err)
+	// 	}
+	case *readermessages.MsgCardRead:
 
 		jsonprint, err := json.MarshalIndent(msg.Map, "", "  ")
 		if err != nil {
@@ -129,23 +129,26 @@ func (a *Actor) Receive(ctx actor.Context) {
 					//Send Msg Error Balance
 
 					if balanceErr, ok := err.(*payment.ErrorBalanceValue); ok {
-						ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: fmt.Sprintf("%.02f", balanceErr.Balance)})
+						a.fmachine.Event(eError, []string{`Saldo insuficiente`, fmt.Sprintf("%.02f", balanceErr.Balance)})
+						// ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: fmt.Sprintf("%.02f", balanceErr.Balance)})
 					} else {
-						ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: ""})
+						a.fmachine.Event(eError, []string{`Saldo insuficiente`, ""})
+						// ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: ""})
 					}
-					a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
-					a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
+					// a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
+					// a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
 				}
-				time.Sleep(3 * time.Second)
+				// time.Sleep(3 * time.Second)
 				return err
 			}
 			a.updates = v
-			ctx.Send(ctx.Sender(), &appreader.MsgWriteCard{UID: msg.UID, Updates: v})
+			ctx.Request(ctx.Sender(), &readermessages.MsgWriteCard{UID: msg.UID, Updates: v})
 			return nil
 		}(); err != nil {
+			a.fmachine.Event(eError, a.mcard["newSaldo"])
 			logs.LogError.Println(err)
 		}
-	case *appreader.MsgCardWritten:
+	case *readermessages.MsgCardWritten:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, a.mcard["newSaldo"])
 		go func() {
@@ -173,14 +176,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 			// logs.LogInfo.Printf("response platform: %s", response)
 			// }()
 		}()
-	case *MsgTagWriteError:
-		if err := func() error {
-			//Send Msg Write error
-			defer ctx.Send(nil, nil)
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
+	// case *MsgTagWriteError:
+	// 	if err := func() error {
+	// 		//Send Msg Write error
+	// 		defer ctx.Send(nil, nil)
+	// 		return nil
+	// 	}(); err != nil {
+	// 		logs.LogError.Println(err)
+	// 	}
 	case *qr.MsgNewCodeQR:
 		logs.LogBuild.Printf("NewQR: %s", msg.Value)
 		v, err := DecodeQR(msg.Value)

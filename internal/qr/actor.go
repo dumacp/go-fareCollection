@@ -16,7 +16,7 @@ func NewActor() actor.Actor {
 
 	a := &Actor{}
 	a.fmachine = NewFSM(nil)
-	a.ch = make(chan int, 0)
+	a.ch = make(chan int)
 	return a
 }
 
@@ -34,8 +34,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 				close(a.chQuitSerial)
 			}
 		}
-		a.chQuitSerial = make(chan int, 0)
-		go RunFSM(&ctx, a.chQuitSerial, a.fmachine)
+		a.chQuitSerial = make(chan int)
+		go RunFSM(ctx, a.chQuitSerial, a.fmachine)
 		a.fmachine.Event(eOpened)
 	case *MsgNewCodeQR:
 		ctx.Send(ctx.Parent(), msg)

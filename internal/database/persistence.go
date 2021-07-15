@@ -3,7 +3,7 @@ package database
 import (
 	"time"
 
-	"github.com/etcd-io/bbolt"
+	"go.etcd.io/bbolt"
 )
 
 type Data struct {
