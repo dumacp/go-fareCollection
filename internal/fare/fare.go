@@ -39,10 +39,11 @@ func (f *FareNode) FindChild(query *QueryFare) *FareNode {
 
 	keysFrom := make(prefix, 0)
 	for k, _ := range f.Kids {
+		// log.Printf("keys: %v", k)
 		keysFrom = append(keysFrom, k)
 	}
 	sort.Sort(sort.Reverse(keysFrom))
-	log.Printf("keys FROM: %v", keysFrom)
+	log.Printf("%d, keys FROM: %v", f.ID, keysFrom)
 
 	for _, indexFrom := range query.KeyIndexesFrom() {
 		log.Printf("indexFROM: %s", indexFrom)
@@ -58,12 +59,18 @@ func (f *FareNode) FindChild(query *QueryFare) *FareNode {
 			}
 			sort.Sort(sort.Reverse(keysTo))
 			log.Printf("keys TO: %v", keysTo)
-			for _, k := range keysTo {
-				to := from[k]
-				for _, nextFare := range to {
-					log.Printf("verify Fare: %+v", nextFare)
-					if query.VerifyFare(nextFare) {
-						return nextFare
+			for _, indexTo := range query.KeyIndexes() {
+				for _, k := range keysTo {
+					if !strings.HasPrefix(indexTo, k) {
+						continue
+					}
+					log.Printf("keyTo, queryTo: %s, %s", k, indexTo)
+					to := from[k]
+					for _, nextFare := range to {
+						log.Printf("verify Fare: %+v", nextFare)
+						if query.VerifyFare(nextFare) {
+							return nextFare
+						}
 					}
 				}
 			}

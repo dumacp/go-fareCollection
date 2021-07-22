@@ -2,6 +2,7 @@ package fare
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -20,7 +21,11 @@ type QueryFare struct {
 }
 
 func (query *QueryFare) VerifyFare(f *FareNode) bool {
-	// log.Println("0 verify")
+	log.Printf("0 verify: %s", query.Time.Sub(query.LastTimePlain))
+	if f.TimeSpan > 0 && f.Type != PLAIN &&
+		(time.Duration(f.TimeSpan)*time.Second < query.Time.Sub(query.LastTimePlain)) {
+		return false
+	}
 	if f.ValidFrom > 0 && f.ValidFrom > query.Time.Unix() {
 		return false
 	}
@@ -70,72 +75,94 @@ func (query *QueryFare) VerifyFare(f *FareNode) bool {
 	return true
 }
 
-func (query *QueryFare) KeyIndexes() []string {
+func (query *QueryFare) KeyIndexes() (reverse []string) {
+	reverse = make([]string, 0)
 	idxes := make([]string, 0)
+	defer func() {
+		for i := range idxes {
+			reverse = append(reverse, idxes[len(idxes)-1-i])
+		}
+	}()
 	idString := &strings.Builder{}
 	if query.ModeID > 0 {
 		idString.WriteString(fmt.Sprintf("%d", query.ModeID))
 		idxes = append(idxes, idString.String())
+	} else {
+		return
 	}
 	if query.RouteID > 0 {
 		idString.WriteString(fmt.Sprintf("-%d", query.RouteID))
 		idxes = append(idxes, idString.String())
+	} else {
+		return
 	}
 	if query.ItineraryID > 0 {
 		idString.WriteString(fmt.Sprintf("-%d", query.ItineraryID))
 		idxes = append(idxes, idString.String())
 	}
-	reverse := make([]string, len(idxes))
-	for i := range idxes {
-		reverse = append(reverse, idxes[len(idxes)-1-i])
-	}
-	return reverse
+	return
 }
 
-func (query *QueryFare) KeyIndexesFrom() []string {
+func (query *QueryFare) KeyIndexesFrom() (reverse []string) {
+	reverse = make([]string, 0)
 	idxes := make([]string, 0)
+	defer func() {
+		for i := range idxes {
+			reverse = append(reverse, idxes[len(idxes)-1-i])
+		}
+	}()
+
 	idString := &strings.Builder{}
 	if query.FromModeID > 0 {
 		idString.WriteString(fmt.Sprintf("%d", query.FromModeID))
 		idxes = append(idxes, idString.String())
+	} else {
+		return
 	}
 	if query.FromRouteID > 0 {
 		idString.WriteString(fmt.Sprintf("-%d", query.FromRouteID))
 		idxes = append(idxes, idString.String())
+	} else {
+		return
 	}
 	if query.FromItineraryID > 0 {
 		idString.WriteString(fmt.Sprintf("-%d", query.FromItineraryID))
 		idxes = append(idxes, idString.String())
 	}
-	reverse := make([]string, 0)
-	for i := range idxes {
-		reverse = append(reverse, idxes[len(idxes)-1-i])
-	}
-	return reverse
+	return
 }
 
-func (query *QueryFare) KeyIndexesWithProfile() []string {
+func (query *QueryFare) KeyIndexesWithProfile() (reverse []string) {
+	reverse = make([]string, 0)
 	idxes := make([]string, 0)
+	defer func() {
+		for i := range idxes {
+			reverse = append(reverse, idxes[len(idxes)-1-i])
+		}
+	}()
 	idString := &strings.Builder{}
 	if query.ProfileID > 0 {
 		idString.WriteString(fmt.Sprintf("%d", query.ProfileID))
 		idxes = append(idxes, idString.String())
 	}
 	if query.ModeID > 0 {
-		idString.WriteString(fmt.Sprintf("-%d", query.ModeID))
+		if query.ProfileID > 0 {
+			idString.WriteString("-")
+		}
+		idString.WriteString(fmt.Sprintf("%d", query.ModeID))
 		idxes = append(idxes, idString.String())
+	} else {
+		return
 	}
 	if query.RouteID > 0 {
 		idString.WriteString(fmt.Sprintf("-%d", query.RouteID))
 		idxes = append(idxes, idString.String())
+	} else {
+		return
 	}
 	if query.ItineraryID > 0 {
 		idString.WriteString(fmt.Sprintf("-%d", query.ItineraryID))
 		idxes = append(idxes, idString.String())
 	}
-	reverse := make([]string, len(idxes))
-	for i := range idxes {
-		reverse = append(reverse, idxes[len(idxes)-1-i])
-	}
-	return reverse
+	return
 }

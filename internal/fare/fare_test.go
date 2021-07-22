@@ -51,7 +51,20 @@ func TestFareNode_FindFare(t *testing.T) {
 		},
 	}
 
-	fareBus_Bus := &FareNode{
+	fareMetro := &FareNode{
+		ID:           2200,
+		FarePolicyID: "2200",
+		ProfileID:    1,
+		ValidFrom:    10000000,
+		ValidTo:      0,
+		TimeSpan:     60 * 60,
+		Type:         PLAIN,
+		ModeID:       2,
+		Fare:         3000,
+		Children:     nil,
+	}
+
+	fareBus_BusRuta11 := &FareNode{
 		ID:           1011,
 		FarePolicyID: "1011",
 		ProfileID:    1,
@@ -62,7 +75,11 @@ func TestFareNode_FindFare(t *testing.T) {
 		ModeID:       1,
 		RouteID:      11,
 		Fare:         1200,
-		Children:     nil,
+		Children: map[string]map[string][]int{
+			"1-11": {
+				"2": []int{2011},
+			},
+		},
 	}
 
 	fareBus_Metro := &FareNode{
@@ -71,7 +88,7 @@ func TestFareNode_FindFare(t *testing.T) {
 		ProfileID:    1,
 		ValidFrom:    10000000,
 		ValidTo:      0,
-		TimeSpan:     60 * 60,
+		TimeSpan:     30 * 60,
 		Type:         INTEG,
 		ModeID:       2,
 		RouteID:      21,
@@ -94,16 +111,16 @@ func TestFareNode_FindFare(t *testing.T) {
 	}
 
 	fareBusRuta11_Metro := &FareNode{
-		ID:           2001,
-		FarePolicyID: "2001",
+		ID:           2011,
+		FarePolicyID: "2011",
 		ProfileID:    1,
 		ValidFrom:    10000000,
 		ValidTo:      0,
-		TimeSpan:     60 * 60,
+		TimeSpan:     30 * 60,
 		Type:         INTEG,
 		ModeID:       2,
 		RouteID:      21,
-		Fare:         300,
+		Fare:         100,
 		Children:     nil,
 	}
 
@@ -122,7 +139,8 @@ func TestFareNode_FindFare(t *testing.T) {
 
 	Fares := map[int]*FareNode{
 		fareBus.ID:             fareBus,
-		fareBus_Bus.ID:         fareBus_Bus,
+		fareMetro.ID:           fareMetro,
+		fareBus_BusRuta11.ID:   fareBus_BusRuta11,
 		fareBus_Metro.ID:       fareBus_Metro,
 		fareBus_MetroLineA.ID:  fareBus_MetroLineA,
 		fareBusRuta11_Metro.ID: fareBusRuta11_Metro,
@@ -156,6 +174,7 @@ func TestFareNode_FindFare(t *testing.T) {
 					Time:            time.Now(),
 				},
 			},
+			want: fareBus,
 		},
 		{
 			name: "test2",
@@ -172,6 +191,24 @@ func TestFareNode_FindFare(t *testing.T) {
 					Time:            time.Now(),
 				},
 			},
+			want: fareBus_BusRuta11,
+		},
+		{
+			name: "test3",
+			args: args{
+				query: &QueryFare{
+					ProfileID:       1,
+					ModeID:          2,
+					RouteID:         21,
+					FromRouteID:     11,
+					FromItineraryID: 110,
+					FromModeID:      1,
+					LastFare:        []*FareNode{fareBus, fareBus_BusRuta11},
+					LastTimePlain:   time.Now().Add(-60 * time.Minute),
+					Time:            time.Now(),
+				},
+			},
+			want: fareBusRuta11_Metro,
 		},
 		// TODO: Add test cases.
 	}

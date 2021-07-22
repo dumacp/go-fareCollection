@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 )
 
 type FareMap map[string][]*FareNode
@@ -12,27 +11,6 @@ type FareMap map[string][]*FareNode
 func CreateTree(m map[int]*FareNode) FareMap {
 	fm := make(map[string][]*FareNode)
 	for _, node := range m {
-		if node.Type != PLAIN {
-			continue
-		}
-		idString := &strings.Builder{}
-		if node.ProfileID > 0 {
-			idString.WriteString(fmt.Sprintf("%d", node.ProfileID))
-		}
-		if node.ModeID > 0 {
-			idString.WriteString(fmt.Sprintf("-%d", node.ModeID))
-		}
-		if node.RouteID > 0 {
-			idString.WriteString(fmt.Sprintf("-%d", node.RouteID))
-		}
-		if node.ItineraryID > 0 {
-			idString.WriteString(fmt.Sprintf("-%d", node.ItineraryID))
-		}
-		if _, ok := fm[idString.String()]; !ok {
-			fm[idString.String()] = make([]*FareNode, 0)
-		}
-		fm[idString.String()] = append(fm[idString.String()], node)
-
 		if len(node.Children) > 0 {
 			if node.Kids == nil {
 				node.Kids = make(map[string]map[string][]*FareNode)
@@ -53,6 +31,26 @@ func CreateTree(m map[int]*FareNode) FareMap {
 				}
 			}
 		}
+		if node.Type != PLAIN {
+			continue
+		}
+		idString := &strings.Builder{}
+		if node.ProfileID > 0 {
+			idString.WriteString(fmt.Sprintf("%d", node.ProfileID))
+		}
+		if node.ModeID > 0 {
+			idString.WriteString(fmt.Sprintf("-%d", node.ModeID))
+		}
+		if node.RouteID > 0 {
+			idString.WriteString(fmt.Sprintf("-%d", node.RouteID))
+		}
+		if node.ItineraryID > 0 {
+			idString.WriteString(fmt.Sprintf("-%d", node.ItineraryID))
+		}
+		if _, ok := fm[idString.String()]; !ok {
+			fm[idString.String()] = make([]*FareNode, 0)
+		}
+		fm[idString.String()] = append(fm[idString.String()], node)
 	}
 	return fm
 }
@@ -78,10 +76,17 @@ func (fm FareMap) FindFare(query *QueryFare) *FareNode {
 	if query.LastFare[0].Type != PLAIN {
 		return fm.FindPlainFare(query)
 	}
-	if query.LastFare[0].TimeSpan > 0 &&
-		((time.Duration(query.LastFare[0].TimeSpan) * time.Second) < query.Time.Sub(query.LastTimePlain)) {
+	if query.FromModeID <= 0 {
 		return fm.FindPlainFare(query)
 	}
+	if query.FromRouteID <= 0 && query.FromItineraryID > 0 {
+		return fm.FindPlainFare(query)
+	}
+
+	// if query.LastFare[0].TimeSpan > 0 &&
+	// 	((time.Duration(query.LastFare[0].TimeSpan) * time.Second) < query.Time.Sub(query.LastTimePlain)) {
+	// 	return fm.FindPlainFare(query)
+	// }
 
 	lastFare := query.LastFare[len(query.LastFare)-1]
 	if fare := lastFare.FindChild(query); fare != nil {
