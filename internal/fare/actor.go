@@ -12,13 +12,13 @@ type Actor struct {
 func (a *Actor) Receive(ctx actor.Context) {
 	logs.LogBuild.Printf("Message arrived in readerActor: %+v, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
-	switch msg := ctx.Message().(type) {
+	switch ctx.Message().(type) {
 	case *actor.Started:
 		ctx.Send(ctx.Self(), &MsgGetFarePolicies{})
 	case *MsgGetFarePolicies:
 		//TODO:
 		//Get Fare Policies from platform
 	case *MsgGetFare:
-		calculate(msg.LastFarePolicies, a.farePolicies)
+		// calculate(msg.LastFarePolicies, a.farePolicies)
 	}
 }

@@ -10,7 +10,7 @@ func FindFareWithMap(lastFarePolicies map[int]int,
 	farePolicies map[int]*FareNode, fareMap FareMap) *FareNode {
 
 	keysTimestamp := make([]int, 0)
-	valuesId := make([]int, 0)
+	// valuesId := make([]int, 0)
 	for _, v := range lastFarePolicies {
 		keysTimestamp = append(keysTimestamp, v)
 	}
@@ -22,7 +22,7 @@ func FindFareWithMap(lastFarePolicies map[int]int,
 		fare := farePolicies[lastFarePolicies[timestamp]]
 		if fare.Type == PLAIN {
 			//timespan in time
-			if fare.TimeSpan < query.Time.Unix()-int64(keysTimestamp[0]) {
+			if int64(fare.TimeSpan) < query.Time.Unix()-int64(keysTimestamp[0]) {
 				return lastFare.FindChild(query)
 			}
 		}
@@ -32,5 +32,5 @@ func FindFareWithMap(lastFarePolicies map[int]int,
 	// for k, v := range lastFarePolicies {
 	// 	farePolicies[k]
 	// }
-	return 0
+	return nil
 }
