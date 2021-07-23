@@ -11,12 +11,12 @@ const (
 	AC            = "AC" //Número de Acompanantes
 	BLOQUEO       = "B"
 
-	FechaTransaccionRecarga       = "FTR"
-	ConsecutivoTransaccionRecarga = "CTR"
-	IDDispositivoRecarga          = "IDVR"
-	ValorTransaccionRecarga       = "VTR"
-	TipoTransaccion               = "TT"
-	ChecksumBloqueRecarga         = "CKR"
+	FechaTransaccionRecarga       = "HISTR_FT"
+	ConsecutivoTransaccionRecarga = "HISTR_CT"
+	IDDispositivoRecarga          = "HISTR_IDV"
+	ValorTransaccionRecarga       = "HISTR_VT"
+	TipoTransaccion               = "HISTR_TT"
+	ChecksumBloqueRecarga         = "HISTR_CK"
 
 	FechaValidezMonedero = "FV"
 
@@ -25,9 +25,9 @@ const (
 	ConsecutivoTarjeta = "CT$"
 
 	//Historicos
-	FechaTransaccion  = "FT"
-	FareID            = "FID"
-	ItineraryID       = "ITI"
-	IDDispositivoUso  = "IDVU"
-	ChecksumBloqueUso = "CKU"
+	FechaTransaccion  = "HISTU_FT"
+	FareID            = "HISTU_FID"
+	ItineraryID       = "HISTU_ITI"
+	IDDispositivoUso  = "HISTU_IDV"
+	ChecksumBloqueUso = "HISTU_CK"
 )
