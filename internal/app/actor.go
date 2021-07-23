@@ -152,7 +152,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, a.mcard["newSaldo"])
 		go func() {
-			tID, ok := a.mcard["seq"].(int32)
+			tID, ok := a.mcard["seq"].(int)
 			if !ok {
 				logs.LogError.Println("seq is not INT")
 			}

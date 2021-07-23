@@ -11,6 +11,14 @@ type Historical interface {
 	DeviceID() int
 }
 
+type HistoricalRecharge interface {
+	DeviceID() int
+	Value() int
+	time() time.Time
+	ConsecutiveID() int
+	TypeTransaction() int
+}
+
 type Payment interface {
 	UID() int
 	ID() int
@@ -19,17 +27,16 @@ type Payment interface {
 	ProfileID() int
 	PMR() bool
 	AC() int
-	Recharged() int
+	Recharged() []HistoricalRecharge
 	Consecutive() int
 	VersionLayout() int
 	Lock() bool
 	RawDataBefore() interface{}
 	RawDataAfter() interface{}
 
-	AddRecharge(int)
-	AddBalance(int)
-	WriteProfile(int)
+	AddRecharge(value, deviceID, typeT, consecutive int)
+	AddBalance(value, deviceID, fareID, itineraryID int)
+	SetProfile(int)
 	IncConsecutive()
 	SetLock()
-	AddHistorical(fareID, itineraryID, deviceID int, date time.Time)
 }

@@ -46,24 +46,24 @@ func ValidationTag(tag map[string]interface{}, ruta int, devID int) (map[string]
 		return nil, errors.New("saldoBk field is empty")
 	}
 
-	saldo := saldo1.(int32)
-	if saldo > saldo2.(int32) {
-		saldo = saldo2.(int32)
+	saldo := saldo1.(int)
+	if saldo > saldo2.(int) {
+		saldo = saldo2.(int)
 	}
 
 	if saldo < cost {
 		return nil, fmt.Errorf("error: %w", &ErrorBalanceValue{Balance: float64(saldo)})
 	}
 	newTag := make(map[string]interface{})
-	if saldo1.(int32) > saldo2.(int32) {
-		newTag["saldo"] = saldo1.(int32) - (saldo1.(int32) - saldo2.(int32)) - cost
-		tag["newSaldo"] = saldo1.(int32) - cost
+	if saldo1.(int) > saldo2.(int) {
+		newTag["saldo"] = saldo1.(int) - (saldo1.(int) - saldo2.(int)) - cost
+		tag["newSaldo"] = saldo1.(int) - cost
 	} else {
-		newTag["saldoBackup"] = saldo2.(int32) - (saldo2.(int32) - saldo1.(int32)) - cost
-		tag["newSaldo"] = saldo2.(int32) - cost
+		newTag["saldoBackup"] = saldo2.(int) - (saldo2.(int) - saldo1.(int)) - cost
+		tag["newSaldo"] = saldo2.(int) - cost
 	}
 
-	v := tag["seq"].(int32) + 1
+	v := tag["seq"].(int) + 1
 	newTag["seq"] = v
 
 	hist, err := History(tag)
@@ -108,13 +108,13 @@ func (h *Hist) ToMapping() map[string]interface{} {
 	prefix := fmt.Sprintf("hist%d_", h.Index)
 
 	mapp := make(map[string]interface{})
-	mapp[fmt.Sprintf("%s%s", prefix, "time")] = uint32(h.Date.Unix())
-	mapp[fmt.Sprintf("%s%s", prefix, "valor")] = int32(h.Valor)
-	mapp[fmt.Sprintf("%s%s", prefix, "iddev")] = uint32(h.DevID)
-	mapp[fmt.Sprintf("%s%s", prefix, "ruta")] = uint32(h.Route)
-	mapp[fmt.Sprintf("%s%s", prefix, "perfil")] = uint16(h.Perfil)
-	mapp[fmt.Sprintf("%s%s", prefix, "seqi")] = uint16(h.Seq)
-	mapp[fmt.Sprintf("%s%s", prefix, "wallett")] = uint16(h.WalletType)
+	mapp[fmt.Sprintf("%s%s", prefix, "time")] = uint(h.Date.Unix())
+	mapp[fmt.Sprintf("%s%s", prefix, "valor")] = int(h.Valor)
+	mapp[fmt.Sprintf("%s%s", prefix, "iddev")] = uint(h.DevID)
+	mapp[fmt.Sprintf("%s%s", prefix, "ruta")] = uint(h.Route)
+	mapp[fmt.Sprintf("%s%s", prefix, "perfil")] = uint(h.Perfil)
+	mapp[fmt.Sprintf("%s%s", prefix, "seqi")] = uint(h.Seq)
+	mapp[fmt.Sprintf("%s%s", prefix, "wallett")] = uint(h.WalletType)
 
 	return mapp
 }
@@ -138,17 +138,17 @@ func History(tag map[string]interface{}) ([]*Hist, error) {
 			}
 			switch key {
 			case "time":
-				hists[ind].Date = time.Unix(int64(v.(uint32)), int64(0))
+				hists[ind].Date = time.Unix(int64(v.(uint)), int64(0))
 			case "valor":
-				hists[ind].Valor = int(v.(int32))
+				hists[ind].Valor = int(v.(int))
 			case "iddev":
-				hists[ind].DevID = int(v.(uint32))
+				hists[ind].DevID = int(v.(uint))
 			case "ruta":
-				hists[ind].Route = int(v.(uint32))
+				hists[ind].Route = int(v.(uint))
 			case "seqi":
-				hists[ind].Seq = int(v.(uint16))
+				hists[ind].Seq = int(v.(uint))
 			case "wallett":
-				hists[ind].WalletType = int(v.(uint16))
+				hists[ind].WalletType = int(v.(uint))
 			}
 		}
 	}

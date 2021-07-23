@@ -1,7 +1,7 @@
 package mplus
 
 import (
-	"errors"
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
@@ -12,38 +12,53 @@ import (
 )
 
 type historicalUse struct {
-	Index           int
-	FareID          int
-	TimeTransaction time.Time
-	ItineraryID     int
-	DeviceID        int
+	index           int
+	fareID          uint
+	timeTransaction time.Time
+	itineraryID     uint
+	deviceID        uint
 }
 type historicalRecharged struct {
 	// FareID          int
-	TimeTransaction time.Time
-	RechargedID     int
-	TypeTransaction int
+	timeTransaction time.Time
+	rechargedID     uint
+	typeTransaction uint
 	// ItineraryID     int
-	Value    int
-	DeviceID int
+	value    int
+	deviceID uint
 }
 
 type mplus struct {
-	UID           int
-	ID            int
-	Historical    []*historicalUse
-	Balance       int
-	ProfileID     int
-	PMR           bool
-	AC            int
-	Recharged     []*historicalRecharged
-	Consecutive   int
-	VersionLayout int
-	Lock          bool
-	DateVaslidity time.Time
-	RawDataBefore interface{}
-	RawDataAfter  interface{}
+	uid           int
+	id            uint
+	historical    []*historicalUse
+	balance       int
+	profileID     uint
+	pmr           bool
+	ac            uint
+	recharged     []*historicalRecharged
+	consecutive   uint
+	versionLayout uint
+	lock          bool
+	dateValidity  time.Time
+	rawDataBefore interface{}
+	rawDataAfter  interface{}
+	actualMap     map[string]interface{}
+	updateMap     map[string]interface{}
 }
+
+// func extractInt(data interface{}) int {
+// 	var result int
+// 	switch v := data.(type) {
+// 	case int:
+// 		result = v
+// 	case uint:
+// 		result = int(v)
+// 	default:
+// 		return 0 //, errors.New("bad format")
+// 	}
+// 	return result //, nil
+// }
 
 func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 
@@ -52,22 +67,22 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 	histu := make(map[string]*historicalUse)
 	histr := make(map[string]*historicalRecharged)
 
-	extractInt := func(data interface{}) (int, error) {
-		var result int
-		switch v := data.(type) {
-		case int:
-			result = v
-		case uint:
-			result = int(v)
-		case uint64:
-			result = int(v)
-		case int64:
-			result = int(v)
-		default:
-			return 0, errors.New("bad format")
-		}
-		return result, nil
-	}
+	// extractInt := func(data interface{}) int {
+	// 	var result int
+	// 	switch v := data.(type) {
+	// 	case int:
+	// 		result = v
+	// 	case uint:
+	// 		result = int(v)
+	// 	case uint64:
+	// 		result = int(v)
+	// 	case int64:
+	// 		result = int(v)
+	// 	default:
+	// 		return 0 //, errors.New("bad format")
+	// 	}
+	// 	return result //, nil
+	// }
 
 	// extractString := func(data interface{}) (string, error) {
 	// 	var result string
@@ -81,46 +96,39 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 	// }
 
 	m := &mplus{}
-	m.UID = uid
+	m.uid = uid
+	m.actualMap = mapa
 	for k, value := range mapa {
 		switch {
 		case k == SaldoTarjeta:
-			if v, err := extractInt(value); err == nil {
-				if m.Balance > v {
-					m.Balance = v
-				}
-			}
+			m.balance, _ = value.(int)
 		case k == SaldoTarjetaBackup:
-			if v, err := extractInt(value); err == nil {
-				if m.Balance > v {
-					m.Balance = v
-				}
-			}
+			m.balance, _ = value.(int)
 		case k == PERFIL:
-			m.ProfileID, _ = extractInt(value)
+			m.profileID, _ = value.(uint)
 		case k == ConsecutivoTarjeta:
-			m.Consecutive, _ = extractInt(value)
+			m.consecutive, _ = value.(uint)
 		case k == BLOQUEO:
-			v, _ := extractInt(value)
+			v, _ := value.(int)
 			if v > 0 {
-				m.Lock = true
+				m.lock = true
 			}
 		case k == NUMEROTARJETA:
-			m.ID, _ = extractInt(value)
+			m.id, _ = value.(uint)
 		case k == VERSIONLAYOUT:
-			m.VersionLayout, _ = extractInt(value)
+			m.versionLayout, _ = value.(uint)
 		case k == PMR:
-			v, _ := extractInt(value)
+			v, _ := value.(uint)
 			if v > 0 {
-				m.PMR = true
+				m.pmr = true
 			}
 		case k == AC:
-			m.AC, _ = extractInt(value)
+			m.ac, _ = value.(uint)
 		case k == FechaValidezMonedero:
-			v, _ := extractInt(value)
-			m.DateVaslidity = time.Unix(int64(v), int64(0))
-		case strings.HasPrefix(k, "HISTU"):
-			re, err := regexp.Compile(`HISTU_(.+)_([0-9])`)
+			v, _ := value.(uint)
+			m.dateValidity = time.Unix(int64(v), int64(0))
+		case strings.HasPrefix(k, HISTORICO_USO):
+			re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_USO))
 			if err != nil {
 				break
 			}
@@ -132,21 +140,21 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 			key := res[1]
 			if _, ok := histu[ind]; !ok {
 				indx, _ := strconv.Atoi(ind)
-				histu[ind] = &historicalUse{Index: indx}
+				histu[ind] = &historicalUse{index: indx}
 			}
 			switch key {
-			case "FT":
-				v, _ := extractInt(value)
-				histu[ind].TimeTransaction = time.Unix(int64(v), int64(0))
-			case "FID":
-				histu[ind].FareID, _ = extractInt(value)
-			case "IDV":
-				histu[ind].DeviceID, _ = extractInt(value)
-			case "ITI":
-				histu[ind].ItineraryID, _ = extractInt(value)
+			case FechaTransaccion:
+				v, _ := value.(uint)
+				histu[ind].timeTransaction = time.Unix(int64(v), int64(0))
+			case FareID:
+				histu[ind].fareID, _ = value.(uint)
+			case IDDispositivoUso:
+				histu[ind].deviceID, _ = value.(uint)
+			case ItineraryID:
+				histu[ind].itineraryID, _ = value.(uint)
 			}
-		case strings.HasPrefix(k, "HISTR"):
-			re, err := regexp.Compile(`HISTR_(.+)_([0-9])`)
+		case strings.HasPrefix(k, HISTORICO_RECARGA):
+			re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_RECARGA))
 			if err != nil {
 				break
 			}
@@ -158,20 +166,20 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 			key := res[1]
 			if _, ok := histu[ind]; !ok {
 				indx, _ := strconv.Atoi(ind)
-				histu[ind] = &historicalUse{Index: indx}
+				histu[ind] = &historicalUse{index: indx}
 			}
 			switch key {
-			case "FT":
-				v, _ := extractInt(value)
-				histr[ind].TimeTransaction = time.Unix(int64(v), int64(0))
-			case "TT":
-				histr[ind].TypeTransaction, _ = extractInt(value)
-			case "IDV":
-				histr[ind].DeviceID, _ = extractInt(value)
-			case "VT":
-				histr[ind].Value, _ = extractInt(value)
-			case "CT":
-				histr[ind].RechargedID, _ = extractInt(value)
+			case FechaTransaccionRecarga:
+				v, _ := value.(uint)
+				histr[ind].timeTransaction = time.Unix(int64(v), int64(0))
+			case TipoTransaccion:
+				histr[ind].typeTransaction, _ = value.(uint)
+			case IDDispositivoRecarga:
+				histr[ind].deviceID, _ = value.(uint)
+			case ValorTransaccionRecarga:
+				histr[ind].value, _ = value.(int)
+			case ConsecutivoTransaccionRecarga:
+				histr[ind].rechargedID, _ = value.(uint)
 			}
 		}
 	}
@@ -183,10 +191,10 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 
 	sort.SliceStable(result,
 		func(i, j int) bool {
-			return result[i].TimeTransaction.Before(result[j].TimeTransaction)
+			return result[i].timeTransaction.Before(result[j].timeTransaction)
 		},
 	)
-	m.Historical = result
+	m.historical = result
 
 	resultr := make([]*historicalRecharged, 0)
 	for _, v := range histr {
@@ -195,11 +203,119 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 
 	sort.SliceStable(resultr,
 		func(i, j int) bool {
-			return resultr[i].TimeTransaction.Before(result[j].TimeTransaction)
+			return resultr[i].timeTransaction.Before(result[j].timeTransaction)
 		},
 	)
-	m.Recharged = resultr
+	m.recharged = resultr
 
 	return nil
+}
 
+func (p *mplus) UID() int {
+	return p.uid
+}
+func (p *mplus) ID() uint {
+	return p.id
+}
+func (p *mplus) Historical() []payment.Historical {
+	return nil
+}
+func (p *mplus) Balance() int {
+	return p.balance
+}
+func (p *mplus) ProfileID() uint {
+	return p.profileID
+}
+func (p *mplus) PMR() bool {
+	return p.pmr
+}
+func (p *mplus) AC() uint {
+	return p.ac
+}
+func (p *mplus) Recharged() []payment.HistoricalRecharge {
+	return nil
+}
+func (p *mplus) Consecutive() uint {
+	return p.consecutive
+}
+func (p *mplus) VersionLayout() uint {
+	return p.versionLayout
+}
+func (p *mplus) Lock() bool {
+	return p.lock
+}
+func (p *mplus) RawDataBefore() interface{} {
+	return nil
+}
+func (p *mplus) RawDataAfter() interface{} {
+	return nil
+}
+
+func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
+	if len(p.recharged) <= 0 {
+		p.recharged = make([]*historicalRecharged, 0)
+		p.recharged = append(p.recharged, &historicalRecharged{})
+
+	}
+	p.recharged[0].value = value
+	p.recharged[0].deviceID = deviceID
+	p.recharged[0].typeTransaction = typeT
+	p.recharged[0].timeTransaction = time.Now()
+	p.recharged[0].rechargedID = consecutive
+}
+func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) {
+	p.balance += value
+	saldoTarjeta, _ := p.actualMap[SaldoTarjeta].(int)
+	saldoTarjetaBackup, _ := p.actualMap[SaldoTarjetaBackup].(int)
+	if value > 0 {
+		if saldoTarjeta > saldoTarjetaBackup {
+			diff := saldoTarjeta - saldoTarjetaBackup
+			if diff > value {
+				saldoTarjetaBackup += value
+			} else {
+				saldoTarjeta += value - diff
+			}
+		} else {
+			diff := saldoTarjetaBackup - saldoTarjeta
+			if diff > value {
+				saldoTarjeta += value
+			} else {
+				saldoTarjetaBackup += value - diff
+			}
+		}
+	} else {
+		if saldoTarjeta > saldoTarjetaBackup {
+			saldoTarjeta += value
+		} else {
+			saldoTarjetaBackup += value
+		}
+	}
+	p.updateMap[SaldoTarjeta] = saldoTarjeta
+	p.updateMap[SaldoTarjetaBackup] = saldoTarjetaBackup
+	if len(p.historical) <= 0 {
+		p.historical = make([]*historicalUse, 0)
+		p.historical = append(p.historical, &historicalUse{})
+		p.historical[0].index = 1
+
+	}
+	p.historical[0].deviceID = deviceID
+	p.historical[0].fareID = fareID
+	p.historical[0].itineraryID = itineraryID
+	p.historical[0].timeTransaction = time.Now()
+
+	h := p.historical[0]
+	p.updateMap[fmt.Sprintf("%s_%d", IDDispositivoUso, h.index)] = h.deviceID
+	p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccion, h.index)] = h.timeTransaction
+	p.updateMap[fmt.Sprintf("%s_%d", FareID, h.index)] = h.fareID
+	p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.index)] = h.itineraryID
+
+}
+func (p *mplus) SetProfile(profile uint) {
+	p.profileID = profile
+}
+func (p *mplus) IncConsecutive() {
+	p.consecutive++
+}
+func (p *mplus) SetLock() {
+	p.lock = true
 }

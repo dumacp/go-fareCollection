@@ -63,7 +63,7 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			a.inputs++
 			value := ""
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].(int32); ok {
+				if v, ok := e.Args[0].(int); ok {
 					// value = fmt.Sprintf("$%.02f", float64(v))
 					value = FormatSaldo(v)
 				}

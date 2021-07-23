@@ -5,7 +5,7 @@ import (
 	"golang.org/x/text/message"
 )
 
-func FormatSaldo(data int32) string {
+func FormatSaldo(data int) string {
 	// res := make([]byte, 0)
 
 	// if data > 1000_000 {

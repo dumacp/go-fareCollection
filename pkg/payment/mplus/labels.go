@@ -11,6 +11,7 @@ const (
 	AC            = "AC" //Número de Acompanantes
 	BLOQUEO       = "B"
 
+	HISTORICO_RECARGA             = "HISTR"
 	FechaTransaccionRecarga       = "HISTR_FT"
 	ConsecutivoTransaccionRecarga = "HISTR_CT"
 	IDDispositivoRecarga          = "HISTR_IDV"
@@ -25,6 +26,7 @@ const (
 	ConsecutivoTarjeta = "CT$"
 
 	//Historicos
+	HISTORICO_USO     = "HISTU"
 	FechaTransaccion  = "HISTU_FT"
 	FareID            = "HISTU_FID"
 	ItineraryID       = "HISTU_ITI"
