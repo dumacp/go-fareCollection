@@ -201,6 +201,13 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 	return m
 }
 
+func (p *mplus) Data() map[string]interface{} {
+	return p.actualMap
+}
+func (p *mplus) Updates() map[string]interface{} {
+	return p.updateMap
+}
+
 func (p *mplus) UID() uint64 {
 	return p.uid
 }
@@ -249,6 +256,7 @@ func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
 	if len(p.recharged) <= 0 {
 		p.recharged = make([]payment.HistoricalRecharge, 0)
 		p.recharged = append(p.recharged, &historicalRecharge{})
+		p.recharged[0].SetIndex(1)
 
 	}
 	p.recharged[0].SetValue(value)
@@ -256,8 +264,19 @@ func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
 	p.recharged[0].SetTypeTransaction(typeT)
 	p.recharged[0].SetTimeTransaction(time.Now())
 	p.recharged[0].SetConsecutiveID(consecutive)
+
+	h := p.recharged[0]
+	p.updateMap[fmt.Sprintf("%s_%d", IDDispositivoRecarga, h.Index())] = h.DeviceID()
+	p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccionRecarga, h.Index())] = h.TimeTransaction()
+	p.updateMap[fmt.Sprintf("%s_%d", ConsecutivoTransaccionRecarga, h.Index())] = h.ConsecutiveID()
+	p.updateMap[fmt.Sprintf("%s_%d", TipoTransaccion, h.Index())] = h.TypeTransaction()
+	p.updateMap[fmt.Sprintf("%s_%d", ValorTransaccionRecarga, h.Index())] = h.Value()
 }
-func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) {
+
+func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) error {
+	if p.balance <= 0 && value < 0 {
+		return payment.ErrorBalance
+	}
 	p.balance += value
 	saldoTarjeta, _ := p.actualMap[SaldoTarjeta].(int)
 	saldoTarjetaBackup, _ := p.actualMap[SaldoTarjetaBackup].(int)
@@ -302,6 +321,8 @@ func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) {
 	p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccion, h.Index())] = h.TimeTransaction()
 	p.updateMap[fmt.Sprintf("%s_%d", FareID, h.Index())] = h.FareID()
 	p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.Index())] = h.ItineraryID()
+
+	return nil
 
 }
 func (p *mplus) SetProfile(profile uint) {

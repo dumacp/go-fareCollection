@@ -11,6 +11,7 @@ type historicalUse struct {
 }
 type historicalRecharge struct {
 	// FareID          int
+	index           int
 	timeTransaction time.Time
 	rechargedID     uint
 	typeTransaction uint
@@ -57,6 +58,14 @@ func (h *historicalUse) SetItineraryID(itineraryID uint) {
 
 func (h *historicalUse) SetDeviceID(deviceID uint) {
 	h.deviceID = deviceID
+}
+
+func (h *historicalRecharge) Index() int {
+	return h.index
+}
+
+func (h *historicalRecharge) SetIndex(index int) {
+	h.index = index
 }
 
 func (h *historicalRecharge) DeviceID() uint {

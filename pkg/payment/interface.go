@@ -10,6 +10,7 @@ type Historical interface {
 	TimeTransaction() time.Time
 	ItineraryID() uint
 	DeviceID() uint
+
 	SetIndex(int)
 	SetFareID(uint)
 	SetTimeTransaction(time.Time)
@@ -18,12 +19,14 @@ type Historical interface {
 }
 
 type HistoricalRecharge interface {
+	Index() int
 	DeviceID() uint
 	Value() int
 	TimeTransaction() time.Time
 	ConsecutiveID() uint
 	TypeTransaction() uint
 
+	SetIndex(int)
 	SetDeviceID(uint)
 	SetValue(int)
 	SetTimeTransaction(time.Time)
@@ -43,11 +46,13 @@ type Payment interface {
 	Consecutive() uint
 	VersionLayout() uint
 	Lock() bool
+	Data() map[string]interface{}
+	Updates() map[string]interface{}
 	RawDataBefore() interface{}
 	RawDataAfter() interface{}
 
 	AddRecharge(value int, deviceID, typeT, consecutive uint)
-	AddBalance(value int, deviceID, fareID, itineraryID uint)
+	AddBalance(value int, deviceID, fareID, itineraryID uint) error
 	SetProfile(uint)
 	IncConsecutive()
 	SetLock()

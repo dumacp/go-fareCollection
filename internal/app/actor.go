@@ -11,10 +11,11 @@ import (
 
 	"github.com/dumacp/go-fareCollection/internal/buzzer"
 	"github.com/dumacp/go-fareCollection/internal/graph"
-	"github.com/dumacp/go-fareCollection/internal/payment"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
+	"github.com/dumacp/go-fareCollection/pkg/payment"
 	"github.com/dumacp/go-fareCollection/pkg/payment/messages"
+	"github.com/dumacp/go-fareCollection/pkg/payment/mplus"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
 )
@@ -33,7 +34,7 @@ type Actor struct {
 	fmachine   *fsm.FSM
 	lastTime   time.Time
 	ctx        actor.Context
-	mcard      map[string]interface{}
+	mcard      payment.Payment
 	updates    map[string]interface{}
 	chNewRand  chan int
 	lastRand   int
@@ -111,6 +112,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			logs.LogError.Println(err)
 		}
 		logs.LogBuild.Printf("tag read: %s", jsonprint)
+		var paym payment.Payment
 		if err := func() error {
 			// if a.actualTag == a.errorWriteTag {
 			// 	//Commit Tag
@@ -119,25 +121,26 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if a.pidReader == nil {
 				a.pidReader = ctx.Sender()
 			}
-			a.mcard = make(map[string]interface{})
+			mcard := make(map[string]interface{})
 			for k, v := range msg.Data {
 				switch value := v.Data.(type) {
 				case *messages.Value_Int64Value:
-					a.mcard[k] = value.Int64Value
+					mcard[k] = value.Int64Value
 				case *messages.Value_Uint64Value:
-					a.mcard[k] = value.Uint64Value
+					mcard[k] = value.Uint64Value
 				case *messages.Value_IntValue:
-					a.mcard[k] = int(value.IntValue)
+					mcard[k] = int(value.IntValue)
 				case *messages.Value_UintValue:
-					a.mcard[k] = uint(value.UintValue)
+					mcard[k] = uint(value.UintValue)
 				case *messages.Value_StringValue:
-					a.mcard[k] = value.StringValue
+					mcard[k] = value.StringValue
 				case *messages.Value_BytesValue:
-					a.mcard[k] = value.BytesValue
+					mcard[k] = value.BytesValue
 				}
 			}
-			v, err := payment.ValidationTag(a.mcard, 1028, 1290)
-			if err != nil {
+			// v, err := payment.ValidationTag(a.mcard, 1028, 1290)
+			paym = mplus.ParseToPayment(msg.Uid, mcard)
+			if err := paym.AddBalance(-1200, 0000, 3033, 4044); err != nil {
 				logs.LogBuild.Println(err)
 				if errors.Is(err, payment.ErrorBalance) {
 					//Send Msg Error Balance
@@ -155,51 +158,51 @@ func (a *Actor) Receive(ctx actor.Context) {
 				// time.Sleep(3 * time.Second)
 				return err
 			}
-			a.updates = v
+			a.updates = paym.Updates()
 			update := make(map[string]*messages.Value)
-			for k, val := range v {
+			for k, val := range paym.Updates() {
 				switch value := val.(type) {
 				case int:
-					update[k] = &messages.Value{&messages.Value_IntValue{int32(value)}}
+					update[k] = &messages.Value{Data: &messages.Value_IntValue{IntValue: int32(value)}}
 				case uint:
-					update[k] = &messages.Value{&messages.Value_UintValue{uint32(value)}}
+					update[k] = &messages.Value{Data: &messages.Value_UintValue{UintValue: uint32(value)}}
 				case int64:
-					update[k] = &messages.Value{&messages.Value_Int64Value{int64(value)}}
+					update[k] = &messages.Value{Data: &messages.Value_Int64Value{Int64Value: int64(value)}}
 				case uint64:
-					update[k] = &messages.Value{&messages.Value_Uint64Value{uint64(value)}}
+					update[k] = &messages.Value{Data: &messages.Value_Uint64Value{Uint64Value: uint64(value)}}
 				case string:
-					update[k] = &messages.Value{&messages.Value_StringValue{value}}
+					update[k] = &messages.Value{Data: &messages.Value_StringValue{StringValue: value}}
 				case []byte:
-					update[k] = &messages.Value{&messages.Value_BytesValue{value}}
+					update[k] = &messages.Value{Data: &messages.Value_BytesValue{BytesValue: value}}
 				}
 			}
 			ctx.Request(ctx.Sender(), &messages.MsgWritePayment{Uid: msg.Uid, Updates: update})
 			return nil
 		}(); err != nil {
-			a.fmachine.Event(eError, a.mcard["newSaldo"])
+			a.fmachine.Event(eError, 1200)
 			logs.LogError.Println(err)
 		}
 	case *messages.MsgWritePaymentResponse:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
-		a.fmachine.Event(eCardValidated, a.mcard["newSaldo"])
+		a.fmachine.Event(eCardValidated, a.mcard.Balance())
 		go func() {
-			tID, ok := a.mcard["seq"].(int)
-			if !ok {
-				logs.LogError.Println("seq is not INT")
-			}
-			name, ok := a.mcard["name"].(string)
-			if !ok {
-				logs.LogError.Println("\"name\" is not STRING")
-			}
+			tID := a.mcard.Consecutive()
+			// if !ok {
+			// 	logs.LogError.Println("seq is not INT")
+			// }
+			id := a.mcard.ID()
+			// if !ok {
+			// 	logs.LogError.Println("\"name\" is not STRING")
+			// }
 			card := make(map[string]interface{})
-			for k, v := range a.mcard {
+			for k, v := range a.mcard.Data() {
 				card[k] = v
 			}
-			for k, v := range a.updates {
+			for k, v := range a.mcard.Updates() {
 				card[k] = v
 			}
 			// go func() {
-			SendUsoTAG(name, int(tID+1), card, a.mcard, []float64{0, 0}, time.Now())
+			SendUsoTAG(fmt.Sprintf("%d", id), int(tID+1), card, a.mcard.Data(), []float64{0, 0}, time.Now())
 			// if err != nil {
 			// 	logs.LogError.Printf("POST error: %s", err)
 			// 	return
