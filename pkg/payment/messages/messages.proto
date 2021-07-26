@@ -1,0 +1,33 @@
+syntax = "proto3";
+package messages;
+// import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
+// import "google/protobuf/any.proto";
+
+
+message Value {
+   oneof Data {
+        uint32   uint_value    = 1;
+        int32    int_value = 2;
+        uint64 uint64_value = 3;
+        int64 int64_value = 4;
+        string string_value = 5;
+        bytes bytes_value = 6;
+   };
+};
+
+message MsgPayment{
+	uint64  uid = 1;
+	uint32 type = 2;
+	map<string, Value> data = 3;
+}
+
+
+message MsgWritePayment{
+	uint64  uid = 1;
+	uint32 type = 2;
+	map<string, Value> updates = 3;
+}
+
+message MsgWritePaymentResponse{
+	uint64  uid = 1;
+}

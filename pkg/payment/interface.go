@@ -5,38 +5,50 @@ import (
 )
 
 type Historical interface {
-	FareID() int
+	Index() int
+	FareID() uint
 	TimeTransaction() time.Time
-	ItineraryID() int
-	DeviceID() int
+	ItineraryID() uint
+	DeviceID() uint
+	SetIndex(int)
+	SetFareID(uint)
+	SetTimeTransaction(time.Time)
+	SetItineraryID(uint)
+	SetDeviceID(uint)
 }
 
 type HistoricalRecharge interface {
-	DeviceID() int
+	DeviceID() uint
 	Value() int
-	time() time.Time
-	ConsecutiveID() int
-	TypeTransaction() int
+	TimeTransaction() time.Time
+	ConsecutiveID() uint
+	TypeTransaction() uint
+
+	SetDeviceID(uint)
+	SetValue(int)
+	SetTimeTransaction(time.Time)
+	SetConsecutiveID(uint)
+	SetTypeTransaction(uint)
 }
 
 type Payment interface {
-	UID() int
-	ID() int
+	UID() uint64
+	ID() uint
 	Historical() []Historical
 	Balance() int
-	ProfileID() int
+	ProfileID() uint
 	PMR() bool
-	AC() int
+	AC() uint
 	Recharged() []HistoricalRecharge
-	Consecutive() int
-	VersionLayout() int
+	Consecutive() uint
+	VersionLayout() uint
 	Lock() bool
 	RawDataBefore() interface{}
 	RawDataAfter() interface{}
 
-	AddRecharge(value, deviceID, typeT, consecutive int)
-	AddBalance(value, deviceID, fareID, itineraryID int)
-	SetProfile(int)
+	AddRecharge(value int, deviceID, typeT, consecutive uint)
+	AddBalance(value int, deviceID, fareID, itineraryID uint)
+	SetProfile(uint)
 	IncConsecutive()
 	SetLock()
 }

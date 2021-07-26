@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	readermessages "github.com/dumacp/go-appliance-contactless/pkg/messages"
+
 	"github.com/dumacp/go-fareCollection/internal/buzzer"
 	"github.com/dumacp/go-fareCollection/internal/graph"
 	"github.com/dumacp/go-fareCollection/internal/payment"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
+	"github.com/dumacp/go-fareCollection/pkg/payment/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
 )
@@ -103,9 +104,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 	// 	}(); err != nil {
 	// 		logs.LogError.Println(err)
 	// 	}
-	case *readermessages.MsgCardRead:
+	case *messages.MsgPayment:
 
-		jsonprint, err := json.MarshalIndent(msg.Map, "", "  ")
+		jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
 		if err != nil {
 			logs.LogError.Println(err)
 		}
@@ -119,8 +120,21 @@ func (a *Actor) Receive(ctx actor.Context) {
 				a.pidReader = ctx.Sender()
 			}
 			a.mcard = make(map[string]interface{})
-			for k, v := range msg.Map {
-				a.mcard[k] = v
+			for k, v := range msg.Data {
+				switch value := v.Data.(type) {
+				case *messages.Value_Int64Value:
+					a.mcard[k] = value.Int64Value
+				case *messages.Value_Uint64Value:
+					a.mcard[k] = value.Uint64Value
+				case *messages.Value_IntValue:
+					a.mcard[k] = int(value.IntValue)
+				case *messages.Value_UintValue:
+					a.mcard[k] = uint(value.UintValue)
+				case *messages.Value_StringValue:
+					a.mcard[k] = value.StringValue
+				case *messages.Value_BytesValue:
+					a.mcard[k] = value.BytesValue
+				}
 			}
 			v, err := payment.ValidationTag(a.mcard, 1028, 1290)
 			if err != nil {
@@ -142,13 +156,30 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return err
 			}
 			a.updates = v
-			ctx.Request(ctx.Sender(), &readermessages.MsgWriteCard{UID: msg.UID, Updates: v})
+			update := make(map[string]*messages.Value)
+			for k, val := range v {
+				switch value := val.(type) {
+				case int:
+					update[k] = &messages.Value{&messages.Value_IntValue{int32(value)}}
+				case uint:
+					update[k] = &messages.Value{&messages.Value_UintValue{uint32(value)}}
+				case int64:
+					update[k] = &messages.Value{&messages.Value_Int64Value{int64(value)}}
+				case uint64:
+					update[k] = &messages.Value{&messages.Value_Uint64Value{uint64(value)}}
+				case string:
+					update[k] = &messages.Value{&messages.Value_StringValue{value}}
+				case []byte:
+					update[k] = &messages.Value{&messages.Value_BytesValue{value}}
+				}
+			}
+			ctx.Request(ctx.Sender(), &messages.MsgWritePayment{Uid: msg.Uid, Updates: update})
 			return nil
 		}(); err != nil {
 			a.fmachine.Event(eError, a.mcard["newSaldo"])
 			logs.LogError.Println(err)
 		}
-	case *readermessages.MsgCardWritten:
+	case *messages.MsgWritePaymentResponse:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, a.mcard["newSaldo"])
 		go func() {

@@ -11,32 +11,15 @@ import (
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 )
 
-type historicalUse struct {
-	index           int
-	fareID          uint
-	timeTransaction time.Time
-	itineraryID     uint
-	deviceID        uint
-}
-type historicalRecharged struct {
-	// FareID          int
-	timeTransaction time.Time
-	rechargedID     uint
-	typeTransaction uint
-	// ItineraryID     int
-	value    int
-	deviceID uint
-}
-
 type mplus struct {
-	uid           int
+	uid           uint64
 	id            uint
-	historical    []*historicalUse
+	historical    []payment.Historical
 	balance       int
 	profileID     uint
 	pmr           bool
 	ac            uint
-	recharged     []*historicalRecharged
+	recharged     []payment.HistoricalRecharge
 	consecutive   uint
 	versionLayout uint
 	lock          bool
@@ -60,12 +43,12 @@ type mplus struct {
 // 	return result //, nil
 // }
 
-func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
+func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 
 	// minorNumberInt32 := -2147483648
 
-	histu := make(map[string]*historicalUse)
-	histr := make(map[string]*historicalRecharged)
+	histu := make(map[string]payment.Historical)
+	histr := make(map[string]payment.HistoricalRecharge)
 
 	// extractInt := func(data interface{}) int {
 	// 	var result int
@@ -145,13 +128,16 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 			switch key {
 			case FechaTransaccion:
 				v, _ := value.(uint)
-				histu[ind].timeTransaction = time.Unix(int64(v), int64(0))
+				histu[ind].SetTimeTransaction(time.Unix(int64(v), int64(0)))
 			case FareID:
-				histu[ind].fareID, _ = value.(uint)
+				v, _ := value.(uint)
+				histu[ind].SetFareID(v)
 			case IDDispositivoUso:
-				histu[ind].deviceID, _ = value.(uint)
+				v, _ := value.(uint)
+				histu[ind].SetDeviceID(v)
 			case ItineraryID:
-				histu[ind].itineraryID, _ = value.(uint)
+				v, _ := value.(uint)
+				histu[ind].SetItineraryID(v)
 			}
 		case strings.HasPrefix(k, HISTORICO_RECARGA):
 			re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_RECARGA))
@@ -171,47 +157,51 @@ func ParseToPayment(uid int, mapa map[string]interface{}) payment.Payment {
 			switch key {
 			case FechaTransaccionRecarga:
 				v, _ := value.(uint)
-				histr[ind].timeTransaction = time.Unix(int64(v), int64(0))
+				histr[ind].SetTimeTransaction(time.Unix(int64(v), int64(0)))
 			case TipoTransaccion:
-				histr[ind].typeTransaction, _ = value.(uint)
+				v, _ := value.(uint)
+				histr[ind].SetTypeTransaction(v)
 			case IDDispositivoRecarga:
-				histr[ind].deviceID, _ = value.(uint)
+				v, _ := value.(uint)
+				histr[ind].SetDeviceID(v)
 			case ValorTransaccionRecarga:
-				histr[ind].value, _ = value.(int)
+				v, _ := value.(int)
+				histr[ind].SetValue(v)
 			case ConsecutivoTransaccionRecarga:
-				histr[ind].rechargedID, _ = value.(uint)
+				v, _ := value.(uint)
+				histr[ind].SetConsecutiveID(v)
 			}
 		}
 	}
 
-	result := make([]*historicalUse, 0)
+	result := make([]payment.Historical, 0)
 	for _, v := range histu {
 		result = append(result, v)
 	}
 
 	sort.SliceStable(result,
 		func(i, j int) bool {
-			return result[i].timeTransaction.Before(result[j].timeTransaction)
+			return result[i].TimeTransaction().Before(result[j].TimeTransaction())
 		},
 	)
 	m.historical = result
 
-	resultr := make([]*historicalRecharged, 0)
+	resultr := make([]payment.HistoricalRecharge, 0)
 	for _, v := range histr {
 		resultr = append(resultr, v)
 	}
 
 	sort.SliceStable(resultr,
 		func(i, j int) bool {
-			return resultr[i].timeTransaction.Before(result[j].timeTransaction)
+			return resultr[i].TimeTransaction().Before(result[j].TimeTransaction())
 		},
 	)
 	m.recharged = resultr
 
-	return nil
+	return m
 }
 
-func (p *mplus) UID() int {
+func (p *mplus) UID() uint64 {
 	return p.uid
 }
 func (p *mplus) ID() uint {
@@ -233,7 +223,11 @@ func (p *mplus) AC() uint {
 	return p.ac
 }
 func (p *mplus) Recharged() []payment.HistoricalRecharge {
-	return nil
+	hs := make([]payment.HistoricalRecharge, 0)
+	for _, v := range p.recharged {
+		hs = append(hs, v)
+	}
+	return hs
 }
 func (p *mplus) Consecutive() uint {
 	return p.consecutive
@@ -253,15 +247,15 @@ func (p *mplus) RawDataAfter() interface{} {
 
 func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
 	if len(p.recharged) <= 0 {
-		p.recharged = make([]*historicalRecharged, 0)
-		p.recharged = append(p.recharged, &historicalRecharged{})
+		p.recharged = make([]payment.HistoricalRecharge, 0)
+		p.recharged = append(p.recharged, &historicalRecharge{})
 
 	}
-	p.recharged[0].value = value
-	p.recharged[0].deviceID = deviceID
-	p.recharged[0].typeTransaction = typeT
-	p.recharged[0].timeTransaction = time.Now()
-	p.recharged[0].rechargedID = consecutive
+	p.recharged[0].SetValue(value)
+	p.recharged[0].SetDeviceID(deviceID)
+	p.recharged[0].SetTypeTransaction(typeT)
+	p.recharged[0].SetTimeTransaction(time.Now())
+	p.recharged[0].SetConsecutiveID(consecutive)
 }
 func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) {
 	p.balance += value
@@ -293,21 +287,21 @@ func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) {
 	p.updateMap[SaldoTarjeta] = saldoTarjeta
 	p.updateMap[SaldoTarjetaBackup] = saldoTarjetaBackup
 	if len(p.historical) <= 0 {
-		p.historical = make([]*historicalUse, 0)
+		p.historical = make([]payment.Historical, 0)
 		p.historical = append(p.historical, &historicalUse{})
-		p.historical[0].index = 1
+		p.historical[0].SetIndex(1)
 
 	}
-	p.historical[0].deviceID = deviceID
-	p.historical[0].fareID = fareID
-	p.historical[0].itineraryID = itineraryID
-	p.historical[0].timeTransaction = time.Now()
+	p.historical[0].SetDeviceID(deviceID)
+	p.historical[0].SetFareID(fareID)
+	p.historical[0].SetItineraryID(itineraryID)
+	p.historical[0].SetTimeTransaction(time.Now())
 
 	h := p.historical[0]
-	p.updateMap[fmt.Sprintf("%s_%d", IDDispositivoUso, h.index)] = h.deviceID
-	p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccion, h.index)] = h.timeTransaction
-	p.updateMap[fmt.Sprintf("%s_%d", FareID, h.index)] = h.fareID
-	p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.index)] = h.itineraryID
+	p.updateMap[fmt.Sprintf("%s_%d", IDDispositivoUso, h.Index())] = h.DeviceID()
+	p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccion, h.Index())] = h.TimeTransaction()
+	p.updateMap[fmt.Sprintf("%s_%d", FareID, h.Index())] = h.FareID()
+	p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.Index())] = h.ItineraryID()
 
 }
 func (p *mplus) SetProfile(profile uint) {
