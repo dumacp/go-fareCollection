@@ -2,7 +2,7 @@ syntax = "proto3";
 package messages;
 // import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 // import "google/protobuf/any.proto";
-option go_package = "github.com/dumacp/go-fareCollection/pkg/payment/messages";
+option go_package = "github.com/dumacp/go-fareCollection/pkg/messages";
 
 
 message Value {
@@ -31,4 +31,14 @@ message MsgWritePayment{
 
 message MsgWritePaymentResponse{
 	uint64  uid = 1;
+}
+
+message MsgWritePaymentError{
+	uint64  uid = 1;
+   string error = 2;
+}
+
+message RegisterFareActor{
+	string addr = 1;
+   string id = 2;
 }

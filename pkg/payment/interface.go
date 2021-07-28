@@ -54,6 +54,6 @@ type Payment interface {
 	AddRecharge(value int, deviceID, typeT, consecutive uint)
 	AddBalance(value int, deviceID, fareID, itineraryID uint) error
 	SetProfile(uint)
-	IncConsecutive()
+	// IncConsecutive()
 	SetLock()
 }

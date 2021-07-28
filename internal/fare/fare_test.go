@@ -12,19 +12,19 @@ func TestFareNode_FindFare(t *testing.T) {
 
 	itsMap := make(itinerary.ItineraryMap)
 	itsMap[110] = &itinerary.Itinerary{
-		ID:      110,
-		RouteID: 11,
-		ModeID:  1,
+		PaymentMediumCode:      110,
+		RoutePaymentMediumCode: 11,
+		ModePaymentMediumCode:  1,
 	}
 	itsMap[210] = &itinerary.Itinerary{
-		ID:      210,
-		RouteID: 21,
-		ModeID:  2,
+		PaymentMediumCode:      210,
+		RoutePaymentMediumCode: 21,
+		ModePaymentMediumCode:  2,
 	}
 	itsMap[111] = &itinerary.Itinerary{
-		ID:      111,
-		RouteID: 11,
-		ModeID:  1,
+		PaymentMediumCode:      111,
+		RoutePaymentMediumCode: 11,
+		ModePaymentMediumCode:  1,
 	}
 
 	fareBus := &FareNode{

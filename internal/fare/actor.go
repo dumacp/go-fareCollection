@@ -17,6 +17,10 @@ type Actor struct {
 	pidItinerary *actor.PID
 }
 
+func NewActor() actor.Actor {
+	return &Actor{}
+}
+
 func (a *Actor) Receive(ctx actor.Context) {
 	logs.LogBuild.Printf("Message arrived in readerActor: %+v, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
@@ -27,7 +31,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgGetFarePolicies:
 		//TODO:
 		//Get Fare Policies from platform
-
+	case *itinerary.MsgMap:
+		if ctx.Sender() != nil {
+			a.pidItinerary = ctx.Sender()
+		}
+		a.itineraryMap = msg.Data
 	case *MsgGetFare:
 		if fare, err := func() (*FareNode, error) {
 			q := &QueryFare{
@@ -46,15 +54,15 @@ func (a *Actor) Receive(ctx actor.Context) {
 						ctx.Request(a.pidItinerary, &itinerary.MsgGetMap{})
 					}
 				} else {
-					q.FromModeID = a.itineraryMap[msg.ItineraryID].ModeID
-					q.FromRouteID = a.itineraryMap[msg.ItineraryID].RouteID
+					q.FromModeID = a.itineraryMap[msg.ItineraryID].ModePaymentMediumCode
+					q.FromRouteID = a.itineraryMap[msg.ItineraryID].RoutePaymentMediumCode
 				}
 			}
-			keySort := make([]int, 0)
+			keySort := make([]int64, 0)
 			for k := range msg.LastFarePolicies {
 				keySort = append(keySort, k)
 			}
-			sort.Ints(keySort)
+			sort.Slice(keySort, func(i, j int) bool { return keySort[i] < keySort[j] })
 
 			foundPlain := false
 			for _, k := range keySort {

@@ -10,11 +10,12 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 
 	"github.com/dumacp/go-fareCollection/internal/buzzer"
+	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/graph"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
+	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
-	"github.com/dumacp/go-fareCollection/pkg/payment/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment/mplus"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
@@ -30,6 +31,7 @@ type Actor struct {
 	pidPicto   *actor.PID
 	pidReader  *actor.PID
 	pidQR      *actor.PID
+	pidFare    *actor.PID
 	inputs     int
 	fmachine   *fsm.FSM
 	lastTime   time.Time
@@ -105,6 +107,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 	// 	}(); err != nil {
 	// 		logs.LogError.Println(err)
 	// 	}
+	case *messages.RegisterFareActor:
+		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.MsgPayment:
 
 		jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
@@ -139,8 +143,44 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 			}
 			// v, err := payment.ValidationTag(a.mcard, 1028, 1290)
+
 			paym = mplus.ParseToPayment(msg.Uid, mcard)
-			if err := paym.AddBalance(-1200, 0000, 3033, 4044); err != nil {
+			lastFares := make(map[int64]int)
+			hs := paym.Historical()
+			for _, v := range hs {
+				timestamp := v.TimeTransaction().Unix()
+				fareid := v.FareID()
+				lastFares[timestamp] = int(fareid)
+			}
+			getFare := &fare.MsgGetFare{
+				LastFarePolicies: lastFares,
+				ProfileID:        int(paym.ProfileID()),
+				ItineraryID:      2022,
+				ModeID:           1011,
+				FromItineraryID:  int(hs[len(hs)-1].ItineraryID()),
+			}
+
+			//TODO: farePID?
+			if a.pidFare == nil {
+				return errors.New("pidFare not found")
+			}
+			resFare, err := ctx.RequestFuture(a.pidFare, getFare, 100*time.Millisecond).Result()
+			if err != nil {
+				return err
+			}
+			cost := 0
+			fareID := 0
+			switch res := resFare.(type) {
+			case *fare.MsgResponseFare:
+				cost = res.Fare
+				fareID = res.FarePolicyID
+			case *fare.MsgError:
+				return errors.New(res.Err)
+			default:
+				return errors.New("fareID not found")
+			}
+
+			if err := paym.AddBalance(-(cost), 0000, 3033, uint(fareID)); err != nil {
 				logs.LogBuild.Println(err)
 				if errors.Is(err, payment.ErrorBalance) {
 					//Send Msg Error Balance
@@ -182,6 +222,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.fmachine.Event(eError, 1200)
 			logs.LogError.Println(err)
 		}
+	case messages.MsgWritePaymentError:
+
 	case *messages.MsgWritePaymentResponse:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, a.mcard.Balance())

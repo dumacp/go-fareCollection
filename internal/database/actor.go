@@ -1,41 +1,292 @@
 package database
 
 import (
+	"errors"
+	"fmt"
+	"log"
+	"time"
+
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-logs/pkg/logs"
+	"github.com/google/uuid"
+	"github.com/looplab/fsm"
 	"go.etcd.io/bbolt"
 )
 
-type Actor struct {
-	db *bbolt.DB
+type dbActor struct {
+	behavior actor.Behavior
+	db       *bbolt.DB
+	fm       *fsm.FSM
+	pathDB   string
+	// mux      sync.Mutex
+	ctx     actor.Context
+	rootctx *actor.RootContext
+	pid     *actor.PID
 }
 
-func NewActor(path string) actor.Actor {
+type DB interface {
+	PID() *actor.PID
+	RootContext() *actor.RootContext
+}
 
-	a := &Actor{}
-	var err error
-	a.db, err = OpenDB(path)
-	if err != nil {
-		panic(err)
+// var instance *dbActor
+// var ctxroot *actor.RootContext
+// var once sync.Once
+
+// func getInstance() DB {
+
+// 	if ctxroot == nil {
+// 		ctx := context.Background().Value("ROOTCONTEXT")
+// 		if ctx == nil {
+// 			sys := actor.NewActorSystem()
+// 			ctxroot = sys.Root
+// 		} else {
+// 			ctxroot = ctx.(*actor.RootContext)
+// 		}
+// 	}
+
+// 	once.Do(func() {
+// 		instance = &dbActor{}
+// 		instance.mux = sync.Mutex{}
+// 		instance.initFSM()
+// 		instance.behavior = make(actor.Behavior, 0)
+// 		instance.behavior.Become(instance.CloseState)
+// 		instance.fm.Event(eOpenCmd)
+// 		props := actor.PropsFromFunc(instance.Receive)
+
+// 		_, err := ctxroot.SpawnNamed(props, "db-actor")
+// 		if err != nil {
+// 			logs.LogError.Panic(err)
+// 		}
+
+// 	})
+// 	return instance
+// }
+
+func (db *dbActor) PID() *actor.PID {
+	return db.pid
+}
+func (db *dbActor) RootContext() *actor.RootContext {
+	return db.rootctx
+}
+
+func Open(ctx *actor.RootContext, pathdb string) (DB, error) {
+
+	instance := &dbActor{}
+	instance.pathDB = pathdb
+
+	props := actor.PropsFromFunc(instance.Receive)
+
+	if ctx == nil {
+		ctx = actor.NewActorSystem().Root
 	}
-	return a
+	instance.rootctx = ctx
+
+	pid, err := ctx.SpawnNamed(props, fmt.Sprintf("db-actor-%d", time.Now().UnixNano()))
+	if err != nil {
+		return nil, err
+	}
+	instance.pid = pid
+	instance.initFSM()
+	instance.behavior = make(actor.Behavior, 0)
+	instance.behavior.Become(instance.CloseState)
+
+	return instance, nil
 }
 
-func (a *Actor) Receive(ctx actor.Context) {
-	switch msg := ctx.Message().(type) {
+func (a *dbActor) Receive(ctx actor.Context) {
 
+	a.ctx = ctx
+	a.behavior.Receive(ctx)
+}
+
+func (a *dbActor) CloseState(ctx actor.Context) {
+	logs.LogBuild.Printf("Message arrive in datab (CloseState): %s, %T", ctx.Message(), ctx.Message())
+	switch ctx.Message().(type) {
 	case *actor.Started:
-		logs.LogBuild.Printf("actor %q started", ctx.Self().GetId())
+		a.fm.Event(eOpenCmd)
+	case *MsgOpenDB:
+		a.fm.Event(eOpenCmd)
+		if ctx.Sender() != nil {
+			ctx.Respond(&MsgOpenDB{})
+		}
+	case *MsgOpenedDB:
+		a.behavior.Become(a.WaitState)
+		a.fm.Event(eOpened)
+	}
+}
 
-	case MsgPersistData:
-		if err := Put(a.db, msg.Database, msg.ID, msg.Indexes, &msg.TimeStamp, msg.Data); err != nil {
-			if ctx.Sender() != nil {
-				ctx.Respond(&MsgAckPersistData{ID: msg.ID, Error: err.Error(), Succes: false})
+func (a *dbActor) WaitState(ctx actor.Context) {
+	logs.LogBuild.Printf("Message arrive in datab (WaitState): %s, %T", ctx.Message(), ctx.Message())
+	switch msg := ctx.Message().(type) {
+	case *MsgOpenDB:
+		if ctx.Sender() != nil {
+			ctx.Respond(&MsgOpenDB{})
+		}
+	case *MsgInsertData:
+
+		if err := func() error {
+			var id string
+			if len(msg.ID) <= 0 {
+				if uid, err := uuid.NewUUID(); err != nil {
+					ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+					return err
+				} else {
+					id = uid.String()
+				}
+			} else {
+				id = msg.ID
 			}
-		} else {
-			if ctx.Sender() != nil {
-				ctx.Respond(&MsgAckPersistData{ID: msg.ID, Error: "", Succes: true})
+
+			if err := a.db.Update(PersistData(id, msg.Data, msg.Database, msg.Collection, false)); err != nil {
+				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+			}
+			ctx.Respond(&MsgAckPersistData{ID: id})
+			logs.LogBuild.Printf("STEP 6_00000: %s", ctx.Sender())
+			return nil
+		}(); err != nil {
+			logs.LogError.Println(err)
+			switch {
+			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
+				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrDatabaseOpen):
+				a.fm.Event(eError)
 			}
 		}
+
+	case *MsgUpdateData:
+		if err := func(ctx actor.Context) error {
+			var id string
+			if len(msg.ID) <= 0 {
+				if uid, err := uuid.NewUUID(); err != nil {
+					ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+					return err
+				} else {
+					id = uid.String()
+				}
+			} else {
+				id = msg.ID
+			}
+
+			logs.LogBuild.Printf("STEP 6_0000: %s", ctx.Sender())
+			if err := a.db.Update(PersistData(id, msg.Data, msg.Database, msg.Collection, true)); err != nil {
+				if ctx.Sender() != nil {
+					ctx.Send(ctx.Sender(), &MsgNoAckPersistData{Error: err.Error()})
+				}
+				return err
+			}
+			if ctx.Sender() != nil {
+				ctx.Send(ctx.Sender(), &MsgAckPersistData{ID: id})
+			}
+			logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
+			//TODO:
+			time.Sleep(1 * time.Second)
+			return nil
+		}(ctx); err != nil {
+			logs.LogError.Println(err)
+			switch {
+			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
+				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrDatabaseOpen):
+				a.fm.Event(eError)
+			}
+		}
+
+	case *MsgDeleteData:
+		if err := func() error {
+			id := msg.ID
+
+			if err := a.db.Update(RemoveData(id, msg.Database, msg.Collection)); err != nil {
+				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+				return err
+			}
+			ctx.Respond(&MsgAckPersistData{ID: id})
+			return nil
+		}(); err != nil {
+			logs.LogError.Println(err)
+			switch {
+			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
+				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrDatabaseOpen):
+				a.fm.Event(eError)
+			}
+		}
+
+	case *MsgGetData:
+		if err := func() error {
+			id := msg.ID
+			data := make([]byte, 0)
+			if err := a.db.View(GetData(&data, id, msg.Database, msg.Collection)); err != nil {
+				ctx.Respond(&MsgNoAckGetData{Error: err.Error()})
+				return err
+			}
+			ctx.Respond(&MsgAckGetData{Data: data})
+			return nil
+		}(); err != nil {
+			logs.LogError.Println(err)
+			switch {
+			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
+				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrDatabaseOpen):
+				a.fm.Event(eError)
+			}
+		}
+	case *MsgQueryData:
+		if err := func() error {
+			prefix := []byte(msg.PrefixID)
+			data := make(chan *QueryType)
+			stop := make(chan int)
+			pidSender := ctx.Sender()
+
+			go func(ctx actor.Context, pid *actor.PID) {
+				defer func() {
+					select {
+					case _, ok := <-data:
+						if !ok {
+							fmt.Println("channel data close")
+						}
+					default:
+						close(data)
+					}
+					// ctx.Send(pid, &MsgAckGetData{Data: nil})
+				}()
+				for v := range data {
+					log.Printf("data in channel: %s", v.ID)
+					if err := ctx.RequestFuture(pid, &MsgQueryResponse{
+						Data:       v.Data,
+						ID:         v.ID,
+						Database:   msg.Database,
+						Collection: msg.Collection,
+					}, 10*time.Second).Wait(); err != nil {
+						logs.LogBuild.Println(err)
+						select {
+						case <-stop:
+						default:
+							close(stop)
+							return
+						}
+					}
+				}
+			}(ctx, pidSender)
+			if err := a.db.View(QueryData(data, stop, msg.Database, msg.Collection, prefix, msg.Reverse)); err != nil {
+				ctx.Respond(&MsgNoAckGetData{Error: err.Error()})
+				return err
+			}
+
+			ctx.Respond(&MsgAckGetData{Data: nil})
+			return nil
+		}(); err != nil {
+			logs.LogError.Println(err)
+			switch {
+			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
+				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrDatabaseOpen):
+				a.fm.Event(eError)
+			}
+		}
+
+	case *MsgCloseDB:
+		a.db.Close()
+		a.fm.Event(eClosed)
 	}
 }

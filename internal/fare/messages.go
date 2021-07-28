@@ -2,7 +2,7 @@ package fare
 
 type MsgGetFarePolicies struct{}
 type MsgGetFare struct {
-	LastFarePolicies map[int]int // key: timestamp (seconds), value: FarePolicyID
+	LastFarePolicies map[int64]int // key: timestamp (seconds), value: FarePolicyID
 	ProfileID        int
 	ItineraryID      int
 	RouteID          int

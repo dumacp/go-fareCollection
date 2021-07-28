@@ -94,6 +94,7 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
 		},
 		beforeEvent(eError): func(e *fsm.Event) {
+			a.lastTime = time.Now()
 			if e.Args != nil && len(e.Args) > 0 {
 				if v, ok := e.Args[0].([]string); ok {
 					a.ctx.Send(a.pidGraph, &graph.MsgError{Value: v})

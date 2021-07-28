@@ -329,6 +329,116 @@ func (x *MsgWritePaymentResponse) GetUid() uint64 {
 	return 0
 }
 
+type MsgWritePaymentError struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Uid   uint64 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Error string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+}
+
+func (x *MsgWritePaymentError) Reset() {
+	*x = MsgWritePaymentError{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *MsgWritePaymentError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MsgWritePaymentError) ProtoMessage() {}
+
+func (x *MsgWritePaymentError) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MsgWritePaymentError.ProtoReflect.Descriptor instead.
+func (*MsgWritePaymentError) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *MsgWritePaymentError) GetUid() uint64 {
+	if x != nil {
+		return x.Uid
+	}
+	return 0
+}
+
+func (x *MsgWritePaymentError) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type RegisterFareActor struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Addr string `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
+	Id   string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (x *RegisterFareActor) Reset() {
+	*x = RegisterFareActor{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RegisterFareActor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterFareActor) ProtoMessage() {}
+
+func (x *RegisterFareActor) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterFareActor.ProtoReflect.Descriptor instead.
+func (*RegisterFareActor) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RegisterFareActor) GetAddr() string {
+	if x != nil {
+		return x.Addr
+	}
+	return ""
+}
+
+func (x *RegisterFareActor) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 var File_messages_proto protoreflect.FileDescriptor
 
 var file_messages_proto_rawDesc = []byte{
@@ -374,11 +484,18 @@ var file_messages_proto_rawDesc = []byte{
 	0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x2b, 0x0a, 0x17, 0x4d, 0x73, 0x67, 0x57,
 	0x72, 0x69, 0x74, 0x65, 0x50, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f,
 	0x6e, 0x73, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04,
-	0x52, 0x03, 0x75, 0x69, 0x64, 0x42, 0x3a, 0x5a, 0x38, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
-	0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x75, 0x6d, 0x61, 0x63, 0x70, 0x2f, 0x67, 0x6f, 0x2d, 0x66, 0x61,
-	0x72, 0x65, 0x43, 0x6f, 0x6c, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x70, 0x6b, 0x67,
-	0x2f, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
-	0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x03, 0x75, 0x69, 0x64, 0x22, 0x3e, 0x0a, 0x14, 0x4d, 0x73, 0x67, 0x57, 0x72, 0x69, 0x74,
+	0x65, 0x50, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x10, 0x0a,
+	0x03, 0x75, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x75, 0x69, 0x64, 0x12,
+	0x14, 0x0a, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05,
+	0x65, 0x72, 0x72, 0x6f, 0x72, 0x22, 0x37, 0x0a, 0x11, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65,
+	0x72, 0x46, 0x61, 0x72, 0x65, 0x41, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x12, 0x0a, 0x04, 0x61, 0x64,
+	0x64, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x61, 0x64, 0x64, 0x72, 0x12, 0x0e,
+	0x0a, 0x02, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x42, 0x32,
+	0x5a, 0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x75, 0x6d,
+	0x61, 0x63, 0x70, 0x2f, 0x67, 0x6f, 0x2d, 0x66, 0x61, 0x72, 0x65, 0x43, 0x6f, 0x6c, 0x6c, 0x65,
+	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -393,18 +510,20 @@ func file_messages_proto_rawDescGZIP() []byte {
 	return file_messages_proto_rawDescData
 }
 
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_messages_proto_goTypes = []interface{}{
 	(*Value)(nil),                   // 0: messages.Value
 	(*MsgPayment)(nil),              // 1: messages.MsgPayment
 	(*MsgWritePayment)(nil),         // 2: messages.MsgWritePayment
 	(*MsgWritePaymentResponse)(nil), // 3: messages.MsgWritePaymentResponse
-	nil,                             // 4: messages.MsgPayment.DataEntry
-	nil,                             // 5: messages.MsgWritePayment.UpdatesEntry
+	(*MsgWritePaymentError)(nil),    // 4: messages.MsgWritePaymentError
+	(*RegisterFareActor)(nil),       // 5: messages.RegisterFareActor
+	nil,                             // 6: messages.MsgPayment.DataEntry
+	nil,                             // 7: messages.MsgWritePayment.UpdatesEntry
 }
 var file_messages_proto_depIdxs = []int32{
-	4, // 0: messages.MsgPayment.data:type_name -> messages.MsgPayment.DataEntry
-	5, // 1: messages.MsgWritePayment.updates:type_name -> messages.MsgWritePayment.UpdatesEntry
+	6, // 0: messages.MsgPayment.data:type_name -> messages.MsgPayment.DataEntry
+	7, // 1: messages.MsgWritePayment.updates:type_name -> messages.MsgWritePayment.UpdatesEntry
 	0, // 2: messages.MsgPayment.DataEntry.value:type_name -> messages.Value
 	0, // 3: messages.MsgWritePayment.UpdatesEntry.value:type_name -> messages.Value
 	4, // [4:4] is the sub-list for method output_type
@@ -468,6 +587,30 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
+		file_messages_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*MsgWritePaymentError); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RegisterFareActor); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_messages_proto_msgTypes[0].OneofWrappers = []interface{}{
 		(*Value_UintValue)(nil),
@@ -483,7 +626,7 @@ func file_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_messages_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

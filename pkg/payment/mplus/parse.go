@@ -50,43 +50,21 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 	histu := make(map[string]payment.Historical)
 	histr := make(map[string]payment.HistoricalRecharge)
 
-	// extractInt := func(data interface{}) int {
-	// 	var result int
-	// 	switch v := data.(type) {
-	// 	case int:
-	// 		result = v
-	// 	case uint:
-	// 		result = int(v)
-	// 	case uint64:
-	// 		result = int(v)
-	// 	case int64:
-	// 		result = int(v)
-	// 	default:
-	// 		return 0 //, errors.New("bad format")
-	// 	}
-	// 	return result //, nil
-	// }
-
-	// extractString := func(data interface{}) (string, error) {
-	// 	var result string
-	// 	switch v := data.(type) {
-	// 	case string:
-	// 		result = v
-	// 	default:
-	// 		return "", errors.New("bad format")
-	// 	}
-	// 	return result, nil
-	// }
-
 	m := &mplus{}
 	m.uid = uid
 	m.actualMap = mapa
 	for k, value := range mapa {
 		switch {
 		case k == SaldoTarjeta:
-			m.balance, _ = value.(int)
+			v, _ := value.(int)
+			if m.balance > v {
+				m.balance = v
+			}
 		case k == SaldoTarjetaBackup:
-			m.balance, _ = value.(int)
+			v, _ := value.(int)
+			if m.balance > v {
+				m.balance = v
+			}
 		case k == PERFIL:
 			m.profileID, _ = value.(uint)
 		case k == ConsecutivoTarjeta:
@@ -179,7 +157,7 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 		result = append(result, v)
 	}
 
-	sort.SliceStable(result,
+	sort.Slice(result,
 		func(i, j int) bool {
 			return result[i].TimeTransaction().Before(result[j].TimeTransaction())
 		},
@@ -215,7 +193,9 @@ func (p *mplus) ID() uint {
 	return p.id
 }
 func (p *mplus) Historical() []payment.Historical {
-	return nil
+	hs := make([]payment.Historical, 0)
+	hs = append(hs, p.historical...)
+	return hs
 }
 func (p *mplus) Balance() int {
 	return p.balance
@@ -231,9 +211,7 @@ func (p *mplus) AC() uint {
 }
 func (p *mplus) Recharged() []payment.HistoricalRecharge {
 	hs := make([]payment.HistoricalRecharge, 0)
-	for _, v := range p.recharged {
-		hs = append(hs, v)
-	}
+	hs = append(hs, p.recharged...)
 	return hs
 }
 func (p *mplus) Consecutive() uint {
@@ -322,15 +300,18 @@ func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) error 
 	p.updateMap[fmt.Sprintf("%s_%d", FareID, h.Index())] = h.FareID()
 	p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.Index())] = h.ItineraryID()
 
+	p.updateMap[ConsecutivoTarjeta] = p.consecutive + 1
+
 	return nil
 
 }
 func (p *mplus) SetProfile(profile uint) {
 	p.profileID = profile
 }
-func (p *mplus) IncConsecutive() {
-	p.consecutive++
-}
+
+// func (p *mplus) IncConsecutive() {
+// 	p.consecutive++
+// }
 func (p *mplus) SetLock() {
 	p.lock = true
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	appreader "github.com/dumacp/go-appliance-contactless/pkg/app"
 	"github.com/dumacp/go-fareCollection/internal/app"
+	"github.com/dumacp/go-fareCollection/internal/fare"
+	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/dumacp/smartcard/multiiso"
 )
@@ -30,6 +32,12 @@ func main() {
 	logs.LogBuild.Println("debug log")
 
 	ctx := actor.NewActorSystem().Root
+
+	propsFare := actor.PropsFromProducer(fare.NewActor)
+	pidFare, err := ctx.SpawnNamed(propsFare, "fare-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
 
 	appActor := app.NewActor()
 	propsApp := actor.PropsFromFunc(appActor.Receive)
@@ -53,16 +61,14 @@ func main() {
 
 	readerActor.Subscribe(pidApp)
 
+	ctx.Send(pidFare, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
+
 	finish := make(chan os.Signal, 1)
 	signal.Notify(finish, syscall.SIGINT)
 	signal.Notify(finish, syscall.SIGTERM)
 
-	for {
-		select {
-		case <-finish:
-			log.Print("Finish")
-			return
-		}
+	for range finish {
+		log.Print("Finish")
+		return
 	}
-
 }
