@@ -16,3 +16,7 @@ type MsgResponseFare struct {
 type MsgError struct {
 	Err string
 }
+
+type MsgTick struct{}
+
+type MsgGetFareInDB struct{}

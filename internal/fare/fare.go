@@ -21,7 +21,7 @@ type Contidition struct {
 type FareNode struct {
 	ID           int                               `json:"id"`
 	FarePolicyID string                            `json:"farePolicyId"`
-	ProfileID    int                               `json:"profileID"`
+	ProfileID    int                               `json:"profileId"`
 	RouteID      int                               `json:"routeId"`
 	ModeID       int                               `json:"modeId"`
 	ItineraryID  int                               `json:"itineraryId"`

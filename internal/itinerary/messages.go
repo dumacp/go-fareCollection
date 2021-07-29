@@ -8,3 +8,5 @@ type MsgTick struct{}
 type MsgGetModes struct{}
 type MsgGetRoutes struct{}
 type MsgGetItinerary struct{}
+
+type MsgGetInDB struct{}

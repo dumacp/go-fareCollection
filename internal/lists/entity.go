@@ -1,5 +1,13 @@
 package lists
 
+import (
+	"encoding/binary"
+	"encoding/hex"
+	"strconv"
+
+	"github.com/dumacp/go-logs/pkg/logs"
+)
+
 type ListElement struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -40,6 +48,33 @@ type Metadata struct {
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
 	UpdatedBy string `json:"updatedBy"`
+}
+
+func Populate(list *List) *List {
+	list.DataIds = new(BinaryTree)
+	//TODO:
+	//MediumIds will be uint32 array
+	for _, v := range list.MediumIds {
+		number, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			if len(v)%2 != 0 {
+				v = v + "0"
+			}
+			h, err := hex.DecodeString(v)
+			if err != nil {
+				logs.LogWarn.Println(err)
+				continue
+			}
+			if len(h)%8 != 0 {
+				h = append(h, make([]byte, len(h)%8)...)
+			}
+			number = int64(binary.LittleEndian.Uint64(h))
+		}
+		list.DataIds.Insert(number)
+	}
+	list.MediumIds = nil
+
+	return list
 }
 
 // {

@@ -33,7 +33,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
 	case *MsgGetParameters:
-		resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp)
+		resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp, nil)
 		if err != nil {
 			logs.LogError.Println(err)
 			break

@@ -3,7 +3,6 @@ package database
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -129,7 +128,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			var id string
 			if len(msg.ID) <= 0 {
 				if uid, err := uuid.NewUUID(); err != nil {
-					ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+					// ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
 					return err
 				} else {
 					id = uid.String()
@@ -139,13 +138,19 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			}
 
 			if err := a.db.Update(PersistData(id, msg.Data, msg.Database, msg.Collection, false)); err != nil {
-				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+				// ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+				return err
 			}
-			ctx.Respond(&MsgAckPersistData{ID: id})
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgAckPersistData{ID: id})
+			}
 			logs.LogBuild.Printf("STEP 6_00000: %s", ctx.Sender())
 			return nil
 		}(); err != nil {
 			logs.LogError.Println(err)
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+			}
 			switch {
 			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
 				a.fm.Event(eError)
@@ -159,7 +164,6 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			var id string
 			if len(msg.ID) <= 0 {
 				if uid, err := uuid.NewUUID(); err != nil {
-					ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
 					return err
 				} else {
 					id = uid.String()
@@ -170,13 +174,10 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 
 			logs.LogBuild.Printf("STEP 6_0000: %s", ctx.Sender())
 			if err := a.db.Update(PersistData(id, msg.Data, msg.Database, msg.Collection, true)); err != nil {
-				if ctx.Sender() != nil {
-					ctx.Send(ctx.Sender(), &MsgNoAckPersistData{Error: err.Error()})
-				}
 				return err
 			}
 			if ctx.Sender() != nil {
-				ctx.Send(ctx.Sender(), &MsgAckPersistData{ID: id})
+				ctx.Respond(&MsgAckPersistData{ID: id})
 			}
 			logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
 			//TODO:
@@ -184,6 +185,9 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			return nil
 		}(ctx); err != nil {
 			logs.LogError.Println(err)
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+			}
 			switch {
 			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
 				a.fm.Event(eError)
@@ -197,12 +201,16 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			id := msg.ID
 
 			if err := a.db.Update(RemoveData(id, msg.Database, msg.Collection)); err != nil {
-				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
 				return err
 			}
-			ctx.Respond(&MsgAckPersistData{ID: id})
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgAckPersistData{ID: id})
+			}
 			return nil
 		}(); err != nil {
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgNoAckPersistData{Error: err.Error()})
+			}
 			logs.LogError.Println(err)
 			switch {
 			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
@@ -217,13 +225,18 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			id := msg.ID
 			data := make([]byte, 0)
 			if err := a.db.View(GetData(&data, id, msg.Database, msg.Collection)); err != nil {
-				ctx.Respond(&MsgNoAckGetData{Error: err.Error()})
+
 				return err
 			}
-			ctx.Respond(&MsgAckGetData{Data: data})
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgAckGetData{Data: data})
+			}
 			return nil
 		}(); err != nil {
 			logs.LogError.Println(err)
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgNoAckGetData{Error: err.Error()})
+			}
 			switch {
 			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
 				a.fm.Event(eError)
@@ -251,14 +264,14 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 					// ctx.Send(pid, &MsgAckGetData{Data: nil})
 				}()
 				for v := range data {
-					log.Printf("data in channel: %s", v.ID)
+					// log.Printf("data in channel: %s, %s", v.ID, pid)
 					if err := ctx.RequestFuture(pid, &MsgQueryResponse{
 						Data:       v.Data,
 						ID:         v.ID,
 						Database:   msg.Database,
 						Collection: msg.Collection,
 					}, 10*time.Second).Wait(); err != nil {
-						logs.LogBuild.Println(err)
+						logs.LogBuild.Printf("error send datadb: %s, %s", err, pid)
 						select {
 						case <-stop:
 						default:
@@ -269,14 +282,18 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 				}
 			}(ctx, pidSender)
 			if err := a.db.View(QueryData(data, stop, msg.Database, msg.Collection, prefix, msg.Reverse)); err != nil {
-				ctx.Respond(&MsgNoAckGetData{Error: err.Error()})
 				return err
 			}
 
-			ctx.Respond(&MsgAckGetData{Data: nil})
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgAckGetData{Data: nil})
+			}
 			return nil
 		}(); err != nil {
 			logs.LogError.Println(err)
+			if ctx.Sender() != nil {
+				ctx.Respond(&MsgNoAckGetData{Error: err.Error()})
+			}
 			switch {
 			case errors.Is(err, bbolt.ErrDatabaseNotOpen):
 				a.fm.Event(eError)

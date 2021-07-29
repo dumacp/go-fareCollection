@@ -1,12 +1,9 @@
 package lists
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -54,7 +51,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if err != nil {
 			logs.LogError.Println(err)
 		}
-		a.db = db.PID()
+		if db != nil {
+			a.db = db.PID()
+		}
 
 		a.quit = make(chan int)
 		go tick(ctx, 60*time.Minute, a.quit)
@@ -64,6 +63,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 		close(a.quit)
 
 	case *MsgGetListsInDB:
+		if a.db == nil {
+			break
+		}
 		ctx.Request(a.db, &database.MsgQueryData{
 			Database:   databaseName,
 			Collection: collectionNameData,
@@ -72,12 +74,30 @@ func (a *Actor) Receive(ctx actor.Context) {
 		})
 	case *database.MsgQueryResponse:
 
+		if ctx.Sender() != nil {
+			ctx.Send(ctx.Sender(), &database.MsgQueryNext{})
+		}
+
 		if msg.Data == nil {
 			break
 		}
 		switch msg.Collection {
 		case collectionNameData:
-			ctx.Send(ctx.Self(), &MsgSetList{Data: msg.Data})
+			list := new(List)
+			if err := json.Unmarshal(msg.Data, list); err != nil {
+				logs.LogError.Println(err)
+				break
+			}
+			if a.listMap == nil {
+				a.listMap = make(map[string]*List)
+			}
+			if v, ok := a.listMap[list.Code]; ok {
+				if v.Metadata.UpdatedAt >= list.Metadata.UpdatedAt {
+					break
+				}
+			}
+			Populate(list)
+			a.listMap[list.Code] = list
 		}
 	case *MsgTick:
 		// ctx.Send(ctx.Self(), &MsgGetLists{})
@@ -86,39 +106,52 @@ func (a *Actor) Receive(ctx actor.Context) {
 				ctx.Send(ctx.Self(), &MsgGetListById{ID: listid})
 			}
 		}
-	case MsgWatchList:
+	case *MsgWatchList:
 		if a.watchLists == nil {
 			a.watchLists = make([]string, 0)
 		}
 		a.watchLists = append(a.watchLists, msg.ID)
 		ctx.Send(ctx.Self(), &MsgTick{})
-	case MsgVerifyInList:
-		if a.listMap == nil {
-			ctx.Send(ctx.Self(), &MsgGetListById{ID: msg.ListID})
-			break
-		}
-		response := &MsgVerifyInListResponse{
-			ListID: msg.ListID,
-			ID:     nil,
-		}
-		for _, id := range msg.ID {
-			if list, ok := a.listMap[msg.ListID]; ok {
-				if list.DataIds == nil {
-					continue
+	case *MsgVerifyInList:
+
+		func() {
+			response := &MsgVerifyInListResponse{
+				ListID: msg.ListID,
+				ID:     nil,
+			}
+			defer func() {
+				if ctx.Sender() != nil {
+					ctx.Respond(response)
 				}
-				if ok := list.DataIds.Search(id); ok {
-					if response.ID == nil {
-						response.ID = make([]int64, 0)
+			}()
+			if a.listMap == nil {
+				ctx.Send(ctx.Self(), &MsgGetListById{ID: msg.ListID})
+				return
+			}
+			if _, ok := a.listMap[msg.ListID]; !ok {
+				ctx.Send(ctx.Self(), &MsgGetListById{ID: msg.ListID})
+				return
+			}
+
+			for _, id := range msg.ID {
+				if list, ok := a.listMap[msg.ListID]; ok {
+					if !list.Active {
+						continue
 					}
-					response.ID = append(response.ID, id)
+					if list.DataIds == nil {
+						continue
+					}
+					if ok := list.DataIds.Search(id); ok {
+						if response.ID == nil {
+							response.ID = make([]int64, 0)
+						}
+						response.ID = append(response.ID, id)
+					}
 				}
 			}
-		}
-		if ctx.Sender() != nil {
-			ctx.Respond(response)
-		}
+		}()
 	case *MsgGetLists:
-		resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp)
+		resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp, nil)
 		if err != nil {
 			logs.LogError.Println(err)
 			break
@@ -136,16 +169,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgGetListById:
 		url := fmt.Sprintf("%s/%s", a.url, msg.ID)
-		resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp)
+		resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
 		if err != nil {
 			logs.LogError.Println(err)
 			break
 		}
 		logs.LogBuild.Printf("Get response: %s", resp)
-		ctx.Send(ctx.Self(), &MsgSetList{Data: resp})
-	case *MsgSetList:
 		list := new(List)
-		if err := json.Unmarshal(msg.Data, list); err != nil {
+		if err := json.Unmarshal(resp, list); err != nil {
 			logs.LogError.Println(err)
 			break
 		}
@@ -153,39 +184,21 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.listMap = make(map[string]*List)
 		}
 		if v, ok := a.listMap[list.Code]; ok {
-			if v.Metadata.UpdatedAt > list.Metadata.UpdatedAt {
+			if v.Metadata.UpdatedAt >= list.Metadata.UpdatedAt {
 				break
 			}
 		}
-		list.DataIds = new(BinaryTree)
-		//TODO:
-		//MediumIds will be uint32 array
-		for _, v := range list.MediumIds {
-			number, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				if len(v)%2 != 0 {
-					v = v + "0"
-				}
-				h, err := hex.DecodeString(v)
-				if err != nil {
-					logs.LogWarn.Println(err)
-					continue
-				}
-				if len(h)%8 != 0 {
-					h = append(h, make([]byte, len(h)%8)...)
-				}
-				number = int64(binary.LittleEndian.Uint64(h))
-			}
-			list.DataIds.Insert(number)
+		if a.db != nil {
+			ctx.Send(a.db, &database.MsgUpdateData{
+				Database:   databaseName,
+				Collection: collectionNameData,
+				ID:         list.ID,
+				Data:       resp,
+			})
 		}
-		ctx.Send(a.db, &database.MsgUpdateData{
-			Database:   databaseName,
-			Collection: collectionNameData,
-			ID:         list.ID,
-			Data:       msg.Data,
-		})
-		list.MediumIds = nil
+		Populate(list)
 		a.listMap[list.Code] = list
+
 	}
 }
 

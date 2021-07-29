@@ -9,10 +9,6 @@ type MsgGetLists struct{}
 type MsgGetListById struct {
 	ID string
 }
-type MsgSetList struct {
-	Data []byte
-}
-
 type MsgWatchList struct {
 	ID string
 }

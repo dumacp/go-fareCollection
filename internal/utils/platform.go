@@ -56,8 +56,8 @@ func Post(client *http.Client,
 }
 
 func Get(client *http.Client,
-	url, username, password string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	url, username, password string, jsonStr []byte) ([]byte, error) {
+	req, err := http.NewRequest("GET", url, bytes.NewBuffer(jsonStr))
 	if err != nil {
 		return nil, err
 	}

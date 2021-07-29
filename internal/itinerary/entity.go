@@ -1,11 +1,12 @@
 package itinerary
 
 type Mode struct {
-	ID                string `json:"id"`
-	Active            bool   `json:"active"`
-	OrganizationId    string `json:"organizationId"`
-	PaymentMediumCode int    `json:"paymentMediumCode"`
-	Name              string `json:"name"`
+	ID                string    `json:"id"`
+	Active            bool      `json:"active"`
+	OrganizationId    string    `json:"organizationId"`
+	PaymentMediumCode int       `json:"paymentMediumCode"`
+	Name              string    `json:"name"`
+	Metadata          *Metadata `json:"metadata"`
 }
 
 // {
@@ -17,16 +18,17 @@ type Mode struct {
 // }
 
 type Route struct {
-	ID                    string `json:"id"`
-	Active                bool   `json:"active"`
-	OrganizationId        string `json:"organizationId"`
-	Name                  string `json:"name"`
-	Code                  int    `json:"code"`
-	AuthorityCode         string `json:"authorityCode"`
-	DivipolCode           string `json:"divipolCode"`
-	ModeID                string `json:"modeId"`
-	PaymentMediumCode     int    `json:"paymentMediumCode"`
-	ModePaymentMediumCode int    `json:"modePaymentMediumCode"`
+	ID                    string    `json:"id"`
+	Active                bool      `json:"active"`
+	OrganizationId        string    `json:"organizationId"`
+	Name                  string    `json:"name"`
+	Code                  string    `json:"code"`
+	AuthorityCode         string    `json:"authorityCode"`
+	DivipolCode           string    `json:"divipolCode"`
+	ModeID                string    `json:"modeId"`
+	PaymentMediumCode     int       `json:"paymentMediumCode"`
+	ModePaymentMediumCode int       `json:"modePaymentMediumCode"`
+	Metadata              *Metadata `json:"metadata"`
 }
 
 // {
@@ -44,14 +46,22 @@ type Route struct {
 // }
 
 type Itinerary struct {
-	ID                     string `json:"id"`
-	Active                 bool   `json:"active"`
-	Direction              string `json:"direction"`
-	Name                   string `json:"name"`
-	RouteID                string `json:"routeId"`
-	PaymentMediumCode      int    `json:"paymentMediumCode"`
-	ModePaymentMediumCode  int    `json:"modePaymentMediumCode"`
-	RoutePaymentMediumCode int    `json:"routePaymentMediumCode"`
+	ID                     string    `json:"id"`
+	Active                 bool      `json:"active"`
+	Direction              string    `json:"direction"`
+	Name                   string    `json:"name"`
+	RouteID                string    `json:"routeId"`
+	PaymentMediumCode      int       `json:"paymentMediumCode"`
+	ModePaymentMediumCode  int       `json:"modePaymentMediumCode"`
+	RoutePaymentMediumCode int       `json:"routePaymentMediumCode"`
+	Metadata               *Metadata `json:"metadata"`
+}
+
+type Metadata struct {
+	CreatedBy string `json:"createdBy"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
+	UpdatedBy string `json:"updatedBy"`
 }
 
 type ItineraryMap map[int]*Itinerary
