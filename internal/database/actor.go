@@ -181,7 +181,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			}
 			logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
 			//TODO:
-			time.Sleep(1 * time.Second)
+			//time.Sleep(1 * time.Second)
 			return nil
 		}(ctx); err != nil {
 			logs.LogError.Println(err)

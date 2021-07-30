@@ -26,6 +26,7 @@ type Actor struct {
 
 const (
 	defaultListURL     = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/payment-medium-lists"
+	filterHttpQuery    = "page=%d&count=%d&queryTotalResultCount=%v&active=%v"
 	defaultUsername    = "dev.nebulae"
 	defaultPassword    = "uno.2.tres"
 	dbpath             = "/SD/boltdb/listdb"
@@ -100,20 +101,25 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.listMap[list.Code] = list
 		}
 	case *MsgTick:
-		// ctx.Send(ctx.Self(), &MsgGetLists{})
+		ctx.Send(ctx.Self(), &MsgGetLists{})
 		if len(a.watchLists) > 0 {
 			for _, listid := range a.watchLists {
 				ctx.Send(ctx.Self(), &MsgGetListById{ID: listid})
 			}
 		}
 	case *MsgWatchList:
+		if a.listInfo == nil {
+			ctx.Send(ctx.Self(), &MsgGetLists{})
+		}
 		if a.watchLists == nil {
 			a.watchLists = make([]string, 0)
 		}
 		a.watchLists = append(a.watchLists, msg.ID)
-		ctx.Send(ctx.Self(), &MsgTick{})
+		if _, ok := a.listInfo[msg.ID]; !ok {
+			break
+		}
+		ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ID].Code})
 	case *MsgVerifyInList:
-
 		func() {
 			response := &MsgVerifyInListResponse{
 				ListID: msg.ListID,
@@ -125,28 +131,28 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 			}()
 			if a.listMap == nil {
-				ctx.Send(ctx.Self(), &MsgGetListById{ID: msg.ListID})
+				if a.listInfo == nil {
+					ctx.Send(ctx.Self(), &MsgGetLists{})
+				}
 				return
 			}
-			if _, ok := a.listMap[msg.ListID]; !ok {
-				ctx.Send(ctx.Self(), &MsgGetListById{ID: msg.ListID})
+			list, ok := a.listMap[msg.ListID]
+			if !ok {
+				if _, ok := a.listInfo[msg.ListID]; ok {
+					ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ListID].ID})
+				}
+				// ctx.Send(ctx.Self(), &MsgGetLists{})
 				return
 			}
-
+			if !list.Active || list.DataIds == nil {
+				return
+			}
 			for _, id := range msg.ID {
-				if list, ok := a.listMap[msg.ListID]; ok {
-					if !list.Active {
-						continue
+				if ok := list.DataIds.Search(id); ok {
+					if response.ID == nil {
+						response.ID = make([]int64, 0)
 					}
-					if list.DataIds == nil {
-						continue
-					}
-					if ok := list.DataIds.Search(id); ok {
-						if response.ID == nil {
-							response.ID = make([]int64, 0)
-						}
-						response.ID = append(response.ID, id)
-					}
+					response.ID = append(response.ID, id)
 				}
 			}
 		}()

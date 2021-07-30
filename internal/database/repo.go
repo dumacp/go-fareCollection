@@ -179,7 +179,7 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 				}
 			} else {
 				for k, v := c.Seek(prefixID); k != nil && bytes.HasPrefix(k, prefixID); k, v = c.Next() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-stop:
 						fmt.Printf("close query datadb")
@@ -193,7 +193,7 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 		} else {
 			if reverse {
 				for k, v := c.Last(); k != nil; k, v = c.Prev() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-stop:
 						fmt.Printf("close query datadb")
@@ -205,7 +205,7 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 				}
 			} else {
 				for k, v := c.First(); k != nil; k, v = c.Next() {
-					fmt.Printf("key=%s, value=%s\n", k, v)
+					// fmt.Printf("key=%s, value=%s\n", k, v)
 					select {
 					case <-stop:
 						fmt.Printf("close query datadb")

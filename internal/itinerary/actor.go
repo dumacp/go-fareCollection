@@ -2,6 +2,7 @@ package itinerary
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -20,6 +21,8 @@ type Actor struct {
 	urlRoute     string
 	urlItinerary string
 	itineraryMap ItineraryMap
+	routeMap     map[int]*Route
+	modeMap      map[int]*Mode
 	db           *actor.PID
 }
 
@@ -28,6 +31,7 @@ const (
 	defaultRouteURL     = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device_routes"
 	defaultItineraryURL = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device_itineraries"
 	defaultUsername     = "dev.nebulae"
+	filterHttpQuery     = "?page=%d&count=%d&active=true"
 	defaultPassword     = "uno.2.tres"
 	dbpath              = "/SD/boltdb/itinerarydb"
 	databaseName        = "itinerarydb"
@@ -39,7 +43,7 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrived in readerActor: %+v, %T, %s",
+	logs.LogBuild.Printf("Message arrived in itineraryActor: %s, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
@@ -68,72 +72,127 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Send(ctx.Self(), &MsgGetRoutes{})
 		ctx.Send(ctx.Self(), &MsgGetItinerary{})
 	case *MsgGetModes:
-		resp, err := utils.Get(a.httpClient, a.urlMode, a.userHttp, a.passHttp, nil)
-		if err != nil {
+		if err := func() error {
+			count := 30
+			numPages := 1000
+			for i := range make([]int, numPages) {
+				filter := fmt.Sprintf(filterHttpQuery, count, i)
+				url := fmt.Sprintf("%s%s", a.urlMode, filter)
+				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+				if err != nil {
+					return err
+				}
+				logs.LogBuild.Printf("Get response: %s", resp)
+				var result []*Mode
+				if err := json.Unmarshal(resp, &result); err != nil {
+					return err
+				}
+				if a.modeMap == nil {
+					a.modeMap = make(map[int]*Mode)
+				}
+				for _, v := range result {
+					a.modeMap[v.PaymentMediumCode] = v
+				}
+
+				if len(result) < count {
+					break
+				}
+			}
+			return nil
+		}(); err != nil {
 			logs.LogError.Println(err)
-			break
-		}
-		logs.LogBuild.Printf("Get response: %s", resp)
-		var result []*Mode
-		if err := json.Unmarshal(resp, &result); err != nil {
-			logs.LogError.Println(err)
-			break
 		}
 	case *MsgGetRoutes:
-		resp, err := utils.Get(a.httpClient, a.urlRoute, a.userHttp, a.passHttp, nil)
-		if err != nil {
+		if err := func() error {
+			count := 30
+			numPages := 1000
+			for i := range make([]int, numPages) {
+				filter := fmt.Sprintf(filterHttpQuery, count, i)
+				url := fmt.Sprintf("%s%s", a.urlRoute, filter)
+				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+				if err != nil {
+					return err
+				}
+				logs.LogBuild.Printf("Get response: %s", resp)
+				var result []*Route
+				if err := json.Unmarshal(resp, &result); err != nil {
+					return err
+				}
+				if a.routeMap == nil {
+					a.routeMap = make(map[int]*Route)
+				}
+				for _, v := range result {
+					a.routeMap[v.PaymentMediumCode] = v
+				}
+				if len(result) < count {
+					break
+				}
+			}
+			return nil
+		}(); err != nil {
 			logs.LogError.Println(err)
-			break
-		}
-		logs.LogBuild.Printf("Get response: %s", resp)
-		var result []*Route
-		if err := json.Unmarshal(resp, &result); err != nil {
-			logs.LogError.Println(err)
-			break
 		}
 	case *MsgGetItinerary:
-		resp, err := utils.Get(a.httpClient, a.urlItinerary, a.userHttp, a.passHttp, nil)
-		if err != nil {
-			logs.LogError.Println(err)
-			break
-		}
-		logs.LogBuild.Printf("Get response: %s", resp)
-		var result []*Itinerary
-		if err := json.Unmarshal(resp, &result); err != nil {
-			logs.LogError.Println(err)
-			break
-		}
-		actives := make(map[int]int)
-		a.itineraryMap = make(ItineraryMap)
-		for _, v := range result {
-			actives[v.ModePaymentMediumCode] = 0
-			a.itineraryMap[v.PaymentMediumCode] = v
-			if iti, ok := a.itineraryMap[v.PaymentMediumCode]; ok {
-				if iti.Metadata.UpdatedAt >= v.Metadata.UpdatedAt {
-					continue
+		if err := func() error {
+			count := 30
+			numPages := 1000
+			actives := make(map[int]int)
+			for i := range make([]int, numPages) {
+				filter := fmt.Sprintf(filterHttpQuery, count, i)
+				url := fmt.Sprintf("%s%s", a.urlItinerary, filter)
+				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+				if err != nil {
+					return err
+				}
+				logs.LogBuild.Printf("Get response: %s", resp)
+				var result []*Itinerary
+				if err := json.Unmarshal(resp, &result); err != nil {
+					return err
+				}
+				if a.itineraryMap == nil {
+					a.itineraryMap = make(ItineraryMap)
+				}
+				for _, v := range result {
+					actives[v.PaymentMediumCode] = 0
+					if iti, ok := a.itineraryMap[v.PaymentMediumCode]; ok {
+						if iti.Metadata.UpdatedAt >= v.Metadata.UpdatedAt {
+							continue
+						}
+					}
+					a.itineraryMap[v.PaymentMediumCode] = v
+					if a.db != nil {
+						data, err := json.Marshal(v)
+						if err != nil {
+							continue
+						}
+						ctx.Send(a.db, &database.MsgUpdateData{
+							Database:   databaseName,
+							Collection: collectionNameData,
+							ID:         v.ID,
+							Data:       data,
+						})
+					}
+				}
+				if len(result) < count {
+					break
 				}
 			}
+
 			if a.db != nil {
-				ctx.Send(a.db, &database.MsgUpdateData{
-					Database:   databaseName,
-					Collection: collectionNameData,
-					ID:         v.ID,
-					Data:       resp,
-				})
-			}
-		}
-
-		if a.db != nil {
-			for k, v := range a.itineraryMap {
-				if _, ok := actives[k]; !ok {
-
-					ctx.Send(a.db, &database.MsgDeleteData{
-						ID:         v.ID,
-						Database:   databaseName,
-						Collection: collectionNameData,
-					})
+				for k, v := range a.itineraryMap {
+					if _, ok := actives[k]; !ok {
+						ctx.Send(a.db, &database.MsgDeleteData{
+							ID:         v.ID,
+							Database:   databaseName,
+							Collection: collectionNameData,
+						})
+					}
 				}
 			}
+			return nil
+
+		}(); err != nil {
+			logs.LogError.Println(err)
 		}
 
 	case *MsgGetMap:

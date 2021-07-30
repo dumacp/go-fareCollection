@@ -17,10 +17,11 @@ import (
 
 const (
 	defaultListURL     = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device-fares"
+	filterHttpQuery    = "?page=%d&count=%d&queryTotalResultCount=%v"
 	defaultUsername    = "dev.nebulae"
 	defaultPassword    = "uno.2.tres"
 	dbpath             = "/SD/boltdb/faredb"
-	databaseName       = "listdb"
+	databaseName       = "faredb"
 	collectionNameData = "farePolicies"
 )
 
@@ -42,7 +43,7 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrived in readerActor: %+v, %T, %s",
+	logs.LogBuild.Printf("Message arrived in fareActor: %s, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
@@ -68,18 +69,20 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if err := func() error {
 			count := 30
 			numPages := 1000
-			var paginationInput = `{
-"paginationInput": {
-	"page": %d,
-	"count": %d,
-	"queryTotalResultCount": true
-	}
-}`
+			// 			var paginationInput = `{
+			// "paginationInput": {
+			// 	"page": %d,
+			// 	"count": %d,
+			// 	"queryTotalResultCount": true
+			// 	}
+			// }`
 			actives := make(map[int]int)
 			for i := range make([]int, numPages) {
-				dataToPagination := fmt.Sprintf(paginationInput, count, i)
-				resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp,
-					[]byte(dataToPagination))
+				// dataToPagination := fmt.Sprintf(paginationInput, count, i)
+				filter := fmt.Sprintf(filterHttpQuery, count, i, true)
+				url := fmt.Sprintf("%s%s", a.url, filter)
+				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp,
+					nil)
 				if err != nil {
 					return err
 				}
@@ -96,18 +99,23 @@ func (a *Actor) Receive(ctx actor.Context) {
 				if a.farePolicies == nil {
 					a.farePolicies = make(map[int]*FareNode)
 				}
-				for _, v := range result.Listing {
-					actives[v.ID] = 0
-					if _, ok := a.farePolicies[v.ID]; ok {
+				for _, fareNode := range result.Listing {
+
+					actives[fareNode.ID] = 0
+					if _, ok := a.farePolicies[fareNode.ID]; ok {
 						continue
 					}
-					a.farePolicies[v.ID] = v
+					a.farePolicies[fareNode.ID] = fareNode
 					if a.db != nil {
+						v, err := json.Marshal(fareNode)
+						if err != nil {
+							continue
+						}
 						ctx.Send(a.db, &database.MsgUpdateData{
 							Database:   databaseName,
 							Collection: collectionNameData,
-							ID:         v.FarePolicyID,
-							Data:       resp,
+							ID:         fmt.Sprintf("%s:%d", fareNode.FarePolicyID, fareNode.ID),
+							Data:       v,
 						})
 					}
 
@@ -202,6 +210,37 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 		// calculate(msg.LastFarePolicies, a.farePolicies)
+	case *MsgGetFareInDB:
+		if a.db == nil {
+			break
+		}
+		ctx.Request(a.db, &database.MsgQueryData{
+			Database:   databaseName,
+			Collection: collectionNameData,
+			PrefixID:   "",
+			Reverse:    false,
+		})
+	case *database.MsgQueryResponse:
+
+		if ctx.Sender() != nil {
+			ctx.Send(ctx.Sender(), &database.MsgQueryNext{})
+		}
+		if msg.Data == nil {
+			break
+		}
+		switch msg.Collection {
+		case collectionNameData:
+			fare := new(FareNode)
+			if err := json.Unmarshal(msg.Data, fare); err != nil {
+				logs.LogError.Println(err)
+				break
+			}
+			if a.itineraryMap == nil {
+				a.fareMap = make(FareMap)
+			}
+			a.farePolicies[fare.ID] = fare
+			a.fareMap = CreateTree(a.farePolicies)
+		}
 	}
 }
 
