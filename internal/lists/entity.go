@@ -58,9 +58,13 @@ func Populate(list *List) *List {
 		number, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
 			if len(v)%2 != 0 {
-				v = v + "0"
+				v = "0" + v
 			}
-			h, err := hex.DecodeString(v)
+			// fmt.Printf("string: %v\n", v)
+			h := make([]byte, 8)
+			diffLen := len(h) - len(v)/2
+			_, err := hex.Decode(h[diffLen:], []byte(v))
+			// fmt.Printf("bytes: %v\n", h)
 			if err != nil {
 				logs.LogWarn.Println(err)
 				continue
@@ -68,7 +72,7 @@ func Populate(list *List) *List {
 			if len(h)%8 != 0 {
 				h = append(h, make([]byte, len(h)%8)...)
 			}
-			number = int64(binary.LittleEndian.Uint64(h))
+			number = int64(binary.BigEndian.Uint64(h))
 		}
 		list.DataIds.Insert(number)
 	}

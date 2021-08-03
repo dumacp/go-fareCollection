@@ -1,5 +1,10 @@
 package lists
 
+import (
+	"fmt"
+	"io"
+)
+
 type BinaryNode struct {
 	left  *BinaryNode
 	right *BinaryNode
@@ -53,4 +58,17 @@ func (t *BinaryTree) Search(data int64) bool {
 		return false
 	}
 	return t.root.search(data)
+}
+
+func print(w io.Writer, node *BinaryNode, ns int, ch rune) {
+	if node == nil {
+		return
+	}
+
+	for i := 0; i < ns; i++ {
+		fmt.Fprint(w, " ")
+	}
+	fmt.Fprintf(w, "%c:%v\n", ch, node.data)
+	print(w, node.left, ns+2, 'L')
+	print(w, node.right, ns+2, 'R')
 }

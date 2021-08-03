@@ -50,7 +50,7 @@ func TestNewActor(t *testing.T) {
 				if err == nil {
 					switch resp := res.(type) {
 					case *MsgVerifyInListResponse:
-						t.Logf("ids in list: %q", resp)
+						t.Logf("ids in list: %v", resp)
 					}
 				}
 			}

@@ -136,6 +136,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 				return
 			}
+			// fmt.Printf("listMap: %#v\n", a.listMap)
 			list, ok := a.listMap[msg.ListID]
 			if !ok {
 				if _, ok := a.listInfo[msg.ListID]; ok {
@@ -144,6 +145,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 				// ctx.Send(ctx.Self(), &MsgGetLists{})
 				return
 			}
+			print(logs.LogBuild.Writer(), list.DataIds.root, 0, 'M')
+
 			if !list.Active || list.DataIds == nil {
 				return
 			}
