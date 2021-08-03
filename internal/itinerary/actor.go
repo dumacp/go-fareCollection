@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/AsynkronIT/protoactor-go/eventstream"
 	"github.com/dumacp/go-fareCollection/internal/database"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
@@ -24,6 +25,7 @@ type Actor struct {
 	routeMap     map[int]*Route
 	modeMap      map[int]*Mode
 	db           *actor.PID
+	evs          *eventstream.EventStream
 }
 
 const (
@@ -42,12 +44,31 @@ func NewActor() actor.Actor {
 	return &Actor{}
 }
 
+func subscribe(ctx actor.Context, evs *eventstream.EventStream) {
+	rootctx := ctx.ActorSystem().Root
+	pid := ctx.Sender()
+	self := ctx.Self()
+
+	fn := func(evt interface{}) {
+		rootctx.RequestWithCustomSender(pid, evt, self)
+	}
+	sub := evs.Subscribe(fn)
+	sub.WithPredicate(func(evt interface{}) bool {
+		switch evt.(type) {
+		case *MsgMap:
+			return true
+		}
+		return false
+	})
+}
+
 func (a *Actor) Receive(ctx actor.Context) {
 	logs.LogBuild.Printf("Message arrived in itineraryActor: %s, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 
+		//TODO: how get this params?
 		a.urlMode = defaultModeURL
 		a.urlRoute = defaultRouteURL
 		a.urlItinerary = defaultItineraryURL
@@ -67,6 +88,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 	case *actor.Stopping:
 		close(a.quit)
+	case *MsgSubscribe:
+		if a.evs == nil {
+			a.evs = eventstream.NewEventStream()
+		}
+		subscribe(ctx, a.evs)
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetModes{})
 		ctx.Send(ctx.Self(), &MsgGetRoutes{})
@@ -133,6 +159,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			logs.LogError.Println(err)
 		}
 	case *MsgGetItinerary:
+		isUpdateMap := false
 		if err := func() error {
 			count := 30
 			numPages := 1000
@@ -159,6 +186,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 							continue
 						}
 					}
+					isUpdateMap = true
 					a.itineraryMap[v.PaymentMediumCode] = v
 					if a.db != nil {
 						data, err := json.Marshal(v)
@@ -194,7 +222,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}(); err != nil {
 			logs.LogError.Println(err)
 		}
-
+		if isUpdateMap {
+			ctx.Send(ctx.Self(), &MsgPublish{})
+		}
+	case *MsgPublish:
+		if a.evs != nil {
+			a.evs.Publish(&MsgMap{Data: a.itineraryMap})
+		}
 	case *MsgGetMap:
 		if ctx.Sender() != nil {
 			ctx.Respond(&MsgMap{Data: a.itineraryMap})

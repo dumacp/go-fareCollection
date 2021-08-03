@@ -10,3 +10,6 @@ type MsgGetRoutes struct{}
 type MsgGetItinerary struct{}
 
 type MsgGetInDB struct{}
+
+type MsgSubscribe struct{}
+type MsgPublish struct{}
