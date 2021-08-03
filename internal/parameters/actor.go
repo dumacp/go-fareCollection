@@ -2,12 +2,25 @@ package parameters
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/AsynkronIT/protoactor-go/eventstream"
+	"github.com/dumacp/go-fareCollection/internal/database"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
+)
+
+const (
+	defaultURL         = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/dev-summary"
+	defaultUsername    = "dev.nebulae"
+	filterHttpQuery    = "?page=%d&count=%d&active=true"
+	defaultPassword    = "uno.2.tres"
+	dbpath             = "/SD/boltdb/parametersdb"
+	databaseName       = "parametersdb"
+	collectionNameData = "parameters"
 )
 
 type Actor struct {
@@ -16,32 +29,100 @@ type Actor struct {
 	userHttp   string
 	passHttp   string
 	url        string
+	id         string
+	db         *actor.PID
+	evs        *eventstream.EventStream
+	parameters *Parameters
 }
 
-func NewActor(url, user, pass string) {
+func NewActor(id string) actor.Actor {
+	return &Actor{id: id}
+}
 
+func subscribe(ctx actor.Context, evs *eventstream.EventStream) {
+	rootctx := ctx.ActorSystem().Root
+	pid := ctx.Sender()
+	self := ctx.Self()
+
+	fn := func(evt interface{}) {
+		rootctx.RequestWithCustomSender(pid, evt, self)
+	}
+	sub := evs.Subscribe(fn)
+	sub.WithPredicate(func(evt interface{}) bool {
+		switch evt.(type) {
+		case *MsgParameters:
+			return true
+		}
+		return false
+	})
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
 	switch ctx.Message().(type) {
 	case *actor.Started:
+
+		//TODO: how get this params?
+		a.url = defaultURL
+		a.passHttp = defaultPassword
+		a.userHttp = defaultUsername
+
+		db, err := database.Open(ctx.ActorSystem().Root, dbpath)
+		if err != nil {
+			logs.LogError.Println(err)
+		}
+		if db != nil {
+			a.db = db.PID()
+		}
+
 		a.quit = make(chan int)
 		go tick(ctx, 60*time.Minute, a.quit)
 
 	case *actor.Stopping:
 		close(a.quit)
+	case *MsgSubscribe:
+		if a.evs == nil {
+			a.evs = eventstream.NewEventStream()
+		}
+		subscribe(ctx, a.evs)
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
 	case *MsgGetParameters:
-		resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp, nil)
-		if err != nil {
+		isUpdateMap := false
+		if err := func() error {
+			url := fmt.Sprintf("%s/%s", a.url, a.id)
+			resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+			if err != nil {
+				return err
+			}
+			logs.LogBuild.Printf("Get response: %s", resp)
+			var result Parameters
+			if err := json.Unmarshal(resp, &result); err != nil {
+				return err
+			}
+
+			if a.parameters == nil || a.parameters.Timestamp < result.Timestamp {
+				isUpdateMap = true
+				if a.db != nil {
+					ctx.Send(a.db, &database.MsgUpdateData{
+						Database:   databaseName,
+						Collection: collectionNameData,
+						ID:         result.ID,
+						Data:       resp,
+					})
+				}
+			}
+
+			return nil
+
+		}(); err != nil {
 			logs.LogError.Println(err)
-			break
 		}
-		var result map[string]interface{}
-		if err := json.Unmarshal(resp, &result); err != nil {
-			logs.LogError.Println(err)
-			break
+		if isUpdateMap {
+			ctx.Send(ctx.Self(), &MsgPublish{})
+		}
+	case *MsgPublish:
+		if a.evs != nil {
+			a.evs.Publish(&MsgParameters{Data: a.parameters})
 		}
 	}
 }
