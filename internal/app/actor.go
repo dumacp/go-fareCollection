@@ -12,6 +12,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/buzzer"
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/graph"
+	"github.com/dumacp/go-fareCollection/internal/itinerary"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
@@ -26,21 +27,22 @@ type Actor struct {
 	// lastTimeDetect time.Time
 	// errorWriteTag  uint64
 	// actualTag      uint64
-	pidGraph   *actor.PID
-	pidBuzzer  *actor.PID
-	pidPicto   *actor.PID
-	pidReader  *actor.PID
-	pidQR      *actor.PID
-	pidFare    *actor.PID
-	inputs     int
-	fmachine   *fsm.FSM
-	lastTime   time.Time
-	ctx        actor.Context
-	mcard      payment.Payment
-	updates    map[string]interface{}
-	chNewRand  chan int
-	lastRand   int
-	actualRand int
+	pidGraph     *actor.PID
+	pidBuzzer    *actor.PID
+	pidPicto     *actor.PID
+	pidReader    *actor.PID
+	pidQR        *actor.PID
+	pidFare      *actor.PID
+	inputs       int
+	fmachine     *fsm.FSM
+	lastTime     time.Time
+	ctx          actor.Context
+	mcard        payment.Payment
+	updates      map[string]interface{}
+	chNewRand    chan int
+	lastRand     int
+	actualRand   int
+	itineraryMap itinerary.ItineraryMap
 }
 
 func NewActor() actor.Actor {
@@ -93,29 +95,33 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		a.fmachine.Event(eStarted)
 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-	// case *MsgTagDetected:
-	// 	if err := func() error {
-	// 		if a.actualTag == a.lastTag {
-	// 			if a.lastTimeDetect.Before(time.Now().Add(-5 * time.Second)) {
-	// 				return nil
-	// 			}
-	// 		}
-	// 		//read card
-	// 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-	// 		a.lastTag = msg.UID
-	// 		return nil
-	// 	}(); err != nil {
-	// 		logs.LogError.Println(err)
-	// 	}
+		// case *MsgTagDetected:
+		// 	if err := func() error {
+		// 		if a.actualTag == a.lastTag {
+		// 			if a.lastTimeDetect.Before(time.Now().Add(-5 * time.Second)) {
+		// 				return nil
+		// 			}
+		// 		}
+		// 		//read card
+		// 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+		// 		a.lastTag = msg.UID
+		// 		return nil
+		// 	}(); err != nil {
+		// 		logs.LogError.Println(err)
+		// 	}
+	case *itinerary.MsgMap:
+		a.itineraryMap = msg.Data
 	case *messages.RegisterFareActor:
 		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.MsgPayment:
 
+		/**/
 		jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
 		if err != nil {
 			logs.LogError.Println(err)
 		}
 		logs.LogBuild.Printf("tag read: %s", jsonprint)
+		/**/
 		var paym payment.Payment
 		if err := func() error {
 			// if a.actualTag == a.errorWriteTag {
@@ -142,9 +148,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 					mcard[k] = value.BytesValue
 				}
 			}
+			logs.LogBuild.Printf("tag map: %v", mcard)
 			// v, err := payment.ValidationTag(a.mcard, 1028, 1290)
 
 			paym = mplus.ParseToPayment(msg.Uid, mcard)
+			a.mcard = paym
+			logs.LogBuild.Printf("tag map parse: %+v", paym)
 			lastFares := make(map[int64]int)
 			hs := paym.Historical()
 			for _, v := range hs {
@@ -155,8 +164,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 			getFare := &fare.MsgGetFare{
 				LastFarePolicies: lastFares,
 				ProfileID:        int(paym.ProfileID()),
-				ItineraryID:      2022,
-				ModeID:           1011,
+				ItineraryID:      157,
+				ModeID:           1,
+				RouteID:          77,
 				FromItineraryID:  int(hs[len(hs)-1].ItineraryID()),
 			}
 
@@ -180,7 +190,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return errors.New("fareID not found")
 			}
 
-			if err := paym.AddBalance(-(cost), 0000, 3033, uint(fareID)); err != nil {
+			if err := paym.AddBalance(-(cost), 3033, uint(fareID), 157); err != nil {
 				logs.LogBuild.Println(err)
 				if errors.Is(err, payment.ErrorBalance) {
 					//Send Msg Error Balance
@@ -199,6 +209,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return err
 			}
 			a.updates = paym.Updates()
+			logs.LogBuild.Printf("tag updates: %+v", paym.Updates())
 			update := make(map[string]*messages.Value)
 			for k, val := range paym.Updates() {
 				switch value := val.(type) {

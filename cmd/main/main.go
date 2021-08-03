@@ -12,6 +12,8 @@ import (
 	appreader "github.com/dumacp/go-appliance-contactless/pkg/app"
 	"github.com/dumacp/go-fareCollection/internal/app"
 	"github.com/dumacp/go-fareCollection/internal/fare"
+	"github.com/dumacp/go-fareCollection/internal/itinerary"
+	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/dumacp/smartcard/multiiso"
@@ -19,10 +21,12 @@ import (
 
 var debug bool
 var logstd bool
+var id string
 
 func init() {
 	flag.BoolVar(&debug, "debug", false, "debug?")
 	flag.BoolVar(&logstd, "logStd", false, "logs in stderr?")
+	flag.StringVar(&id, "id", "demo", "device ID")
 }
 
 func main() {
@@ -35,6 +39,22 @@ func main() {
 
 	propsFare := actor.PropsFromProducer(fare.NewActor)
 	pidFare, err := ctx.SpawnNamed(propsFare, "fare-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
+
+	itiActor := itinerary.NewActor()
+	propsIti := actor.PropsFromFunc(itiActor.Receive)
+
+	pidIti, err := ctx.SpawnNamed(propsIti, "iti-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
+
+	paramActor := parameters.NewActor(id)
+	propsParam := actor.PropsFromFunc(paramActor.Receive)
+
+	pidParam, err := ctx.SpawnNamed(propsParam, "param-actor")
 	if err != nil {
 		logs.LogError.Fatalln(err)
 	}
@@ -61,7 +81,10 @@ func main() {
 
 	readerActor.Subscribe(pidApp)
 
-	ctx.Send(pidFare, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
+	ctx.Send(pidApp, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
+	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidFare)
+	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidApp)
+	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
 
 	finish := make(chan os.Signal, 1)
 	signal.Notify(finish, syscall.SIGINT)

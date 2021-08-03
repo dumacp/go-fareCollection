@@ -186,7 +186,7 @@ func (a *Actor) RunFSM() {
 						break
 					}
 				case sError:
-					if time.Now().Add(5 * time.Second).After(a.lastTime) {
+					if time.Now().Add(-5 * time.Second).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}
