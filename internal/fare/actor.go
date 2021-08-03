@@ -43,7 +43,7 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrived in fareActor: %s, %T, %s",
+	logs.LogBuild.Printf("Message arrived in fareActor: %+v, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
@@ -156,6 +156,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				ItineraryID:     msg.ItineraryID,
 				RouteID:         msg.RouteID,
 				ModeID:          msg.ModeID,
+				ProfileID:       msg.ProfileID,
 				LastFare:        make([]*FareNode, 0),
 			}
 			if msg.FromItineraryID > 0 {
@@ -176,19 +177,27 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			sort.Slice(keySort, func(i, j int) bool { return keySort[i] < keySort[j] })
 
-			foundPlain := false
+			logs.LogBuild.Printf("fare map: %#v", a.fareMap)
+			logs.LogBuild.Printf("fare policies: %#v", a.farePolicies)
+			logs.LogBuild.Printf("last  fare policies: %#v", msg.LastFarePolicies)
+			// foundPlain := false
 			for _, k := range keySort {
-				fare := a.farePolicies[msg.LastFarePolicies[k]]
-				if !foundPlain {
-					if fare.Type == PLAIN {
-						foundPlain = true
-						q.LastFare = append(q.LastFare, fare)
-						q.LastTimePlain = time.Unix(int64(k), 0)
-					}
-					continue
+				fare, ok := a.farePolicies[msg.LastFarePolicies[k]]
+				if !ok {
+					break
 				}
+				// if !foundPlain {
+				if fare.Type == PLAIN {
+					// foundPlain = true
+					q.LastFare = append(q.LastFare, fare)
+					q.LastTimePlain = time.Unix(int64(k), 0)
+					break
+				}
+				// continue
+				// }
 				q.LastFare = append(q.LastFare, fare)
 			}
+			logs.LogBuild.Printf("fare query: %#v", q)
 			fare := a.fareMap.FindFare(q)
 			if fare == nil {
 				return nil, errors.New("fare Policy not found")
@@ -241,6 +250,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.farePolicies[fare.ID] = fare
 			a.fareMap = CreateTree(a.farePolicies)
 		}
+		logs.LogBuild.Printf("fare map: %#v", a.fareMap)
 	}
 }
 

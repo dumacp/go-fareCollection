@@ -2,7 +2,6 @@ package fare
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -21,16 +20,17 @@ type QueryFare struct {
 }
 
 func (query *QueryFare) VerifyFare(f *FareNode) bool {
-	log.Printf("0 verify: %s", query.Time.Sub(query.LastTimePlain))
+	// log.Printf("0 verify: %+v, %s", f, query.Time.Sub(query.LastTimePlain))
 	if f.TimeSpan > 0 && f.Type != PLAIN &&
 		(time.Duration(f.TimeSpan)*time.Second < query.Time.Sub(query.LastTimePlain)) {
 		return false
 	}
-	if f.ValidFrom > 0 && f.ValidFrom > query.Time.Unix() {
+	// log.Printf("1 verify: %d, %d", f.ValidFrom, query.Time.UnixNano()/1000000)
+	if f.ValidFrom > 0 && f.ValidFrom > query.Time.UnixNano()/1000000 {
 		return false
 	}
-	// log.Println("1 verify")
-	if f.ValidTo > 0 && f.ValidTo < query.Time.Unix() {
+	// log.Printf("1 verify: %d, %d", f.ValidTo, query.Time.UnixNano()/1000000)
+	if f.ValidTo > 0 && f.ValidTo < query.Time.UnixNano()/1000000 {
 		return false
 	}
 	// log.Println("2 verify")

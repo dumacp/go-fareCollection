@@ -32,16 +32,28 @@ func TestNewActor(t *testing.T) {
 		{
 			name: "test1",
 			args: args{
-				rootctx:  rootctx,
-				pid:      pid,
-				messages: []interface{}{nil},
+				rootctx: rootctx,
+				pid:     pid,
+				messages: []interface{}{&MsgGetFare{
+					LastFarePolicies: nil,
+					ProfileID:        1,
+					ItineraryID:      0,
+					ModeID:           1,
+					RouteID:          77,
+					FromItineraryID:  0,
+				}},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, msg := range tt.args.messages {
-				rootctx.RequestFuture(tt.args.pid, msg, time.Millisecond*900).Result()
+				res, err := rootctx.RequestFuture(tt.args.pid, msg, time.Millisecond*900).Result()
+				if err != nil {
+					t.Log(err)
+					continue
+				}
+				t.Logf("result: %#v", res)
 
 			}
 			time.Sleep(10 * time.Second)
