@@ -13,6 +13,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/app"
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/itinerary"
+	"github.com/dumacp/go-fareCollection/internal/lists"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
@@ -26,7 +27,7 @@ var id string
 func init() {
 	flag.BoolVar(&debug, "debug", false, "debug?")
 	flag.BoolVar(&logstd, "logStd", false, "logs in stderr?")
-	flag.StringVar(&id, "id", "demo", "device ID")
+	flag.StringVar(&id, "id", "OMZV7-0001", "device ID")
 }
 
 func main() {
@@ -59,6 +60,13 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
+	propsList := actor.PropsFromProducer(lists.NewActor)
+
+	pidList, err := ctx.SpawnNamed(propsList, "list-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
+
 	appActor := app.NewActor()
 	propsApp := actor.PropsFromFunc(appActor.Receive)
 
@@ -82,8 +90,9 @@ func main() {
 	readerActor.Subscribe(pidApp)
 
 	ctx.Send(pidApp, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
+	ctx.Send(pidApp, &messages.RegisterListActor{Addr: pidList.Address, Id: pidList.Id})
 	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidFare)
-	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidApp)
+	// ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidApp)
 	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
 
 	finish := make(chan os.Signal, 1)
