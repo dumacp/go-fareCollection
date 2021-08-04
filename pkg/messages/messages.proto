@@ -42,3 +42,7 @@ message RegisterFareActor{
 	string addr = 1;
    string id = 2;
 }
+message RegisterListActor{
+	string addr = 1;
+   string id = 2;
+}
