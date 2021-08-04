@@ -24,15 +24,16 @@ const (
 )
 
 type Actor struct {
-	quit       chan int
-	httpClient *http.Client
-	userHttp   string
-	passHttp   string
-	url        string
-	id         string
-	db         *actor.PID
-	evs        *eventstream.EventStream
-	parameters *Parameters
+	quit               chan int
+	httpClient         *http.Client
+	userHttp           string
+	passHttp           string
+	url                string
+	id                 string
+	db                 *actor.PID
+	evs                *eventstream.EventStream
+	parameters         *Parameters
+	platformParameters *PlatformParameters
 }
 
 func NewActor(id string) actor.Actor {
@@ -58,7 +59,9 @@ func subscribe(ctx actor.Context, evs *eventstream.EventStream) {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
-	switch ctx.Message().(type) {
+	logs.LogBuild.Printf("Message arrived in paramActor: %s, %T, %s",
+		ctx.Message(), ctx.Message(), ctx.Sender())
+	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 
 		//TODO: how get this params?
@@ -84,6 +87,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.evs = eventstream.NewEventStream()
 		}
 		subscribe(ctx, a.evs)
+
+		if a.parameters != nil && ctx.Sender() != nil {
+			ctx.Respond(&MsgParameters{Data: a.parameters})
+		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
 	case *MsgGetParameters:
@@ -94,35 +101,82 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if err != nil {
 				return err
 			}
+			logs.LogBuild.Printf("Get url: %s", url)
 			logs.LogBuild.Printf("Get response: %s", resp)
-			var result Parameters
+			var result PlatformParameters
 			if err := json.Unmarshal(resp, &result); err != nil {
 				return err
 			}
 
-			if a.parameters == nil || a.parameters.Timestamp < result.Timestamp {
-				isUpdateMap = true
-				if a.db != nil {
+			if a.platformParameters == nil || a.platformParameters.Timestamp < result.Timestamp {
+
+				a.platformParameters = &result
+				if a.parameters == nil {
+					isUpdateMap = true
+					a.parameters = new(Parameters)
+				} else {
+					if a.parameters.Timestamp < result.Timestamp {
+						isUpdateMap = true
+					}
+				}
+				a.parameters.FromPlatform(&result)
+
+				data, err := json.Marshal(a.parameters)
+				if err != nil {
+					isUpdateMap = false
+					return err
+				}
+				if a.db != nil && isUpdateMap {
 					ctx.Send(a.db, &database.MsgUpdateData{
 						Database:   databaseName,
 						Collection: collectionNameData,
-						ID:         result.ID,
-						Data:       resp,
+						ID:         a.parameters.ID,
+						Data:       data,
 					})
 				}
 			}
-
 			return nil
 
 		}(); err != nil {
 			logs.LogError.Println(err)
 		}
 		if isUpdateMap {
+			logs.LogBuild.Printf("params: %+v", a.parameters)
 			ctx.Send(ctx.Self(), &MsgPublish{})
 		}
 	case *MsgPublish:
 		if a.evs != nil {
-			a.evs.Publish(&MsgParameters{Data: a.parameters})
+			if a.parameters != nil {
+				a.evs.Publish(&MsgParameters{Data: a.parameters})
+			}
+		}
+	case *MsgGetInDB:
+		if a.db == nil {
+			break
+		}
+		ctx.Request(a.db, &database.MsgQueryData{
+			Database:   databaseName,
+			Collection: collectionNameData,
+			PrefixID:   a.id,
+			Reverse:    false,
+		})
+	case *database.MsgQueryResponse:
+		if ctx.Sender() != nil {
+			ctx.Send(ctx.Sender(), &database.MsgQueryNext{})
+		}
+		if msg.Data == nil {
+			break
+		}
+		switch msg.Collection {
+		case collectionNameData:
+			param := new(Parameters)
+			if err := json.Unmarshal(msg.Data, param); err != nil {
+				logs.LogError.Println(err)
+				break
+			}
+			if a.parameters == nil || a.parameters.Timestamp < param.Timestamp {
+				a.parameters = param
+			}
 		}
 	}
 }
@@ -131,8 +185,15 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
+	t2 := time.After(3 * time.Second)
+	t3 := time.After(2 * time.Second)
 	for {
 		select {
+		case <-t3:
+			rootctx.Send(self, &MsgGetInDB{})
+		case <-t2:
+			rootctx.Send(self, &MsgTick{})
+			rootctx.Send(self, &MsgPublish{})
 		case <-t1.C:
 			rootctx.Send(self, &MsgTick{})
 		case <-quit:

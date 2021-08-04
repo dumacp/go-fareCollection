@@ -9,9 +9,10 @@ import (
 )
 
 type ListElement struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Code string `json:"code"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Code      string `json:"code"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 // type ListData struct {
@@ -31,6 +32,7 @@ type List struct {
 	OrganizationID    string             `json:"organizationId"`
 	Metadata          *Metadata          `json:"metadata"`
 	MediumIds         []string           `json:"mediumIds"`
+	MediumIdType      string             `json:"mediumIdType"`
 	DataIds           *BinaryTree
 	TimeUpload        int64
 }
@@ -55,8 +57,16 @@ func Populate(list *List) *List {
 	//TODO:
 	//MediumIds will be uint32 array
 	for _, v := range list.MediumIds {
-		number, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
+		number := int64(0)
+		switch list.MediumIdType {
+		case "SEQ":
+			var err error
+			number, err = strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				logs.LogWarn.Println(err)
+				continue
+			}
+		case "MEDIUMID":
 			if len(v)%2 != 0 {
 				v = "0" + v
 			}

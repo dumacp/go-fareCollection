@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type Parameters struct {
+type PlatformParameters struct {
 	ID                  string            `json:"id"`
 	ApplicationIds      []string          `json:"applicationIds"`
 	GroupID             string            `json:"groupId"`
@@ -17,7 +17,26 @@ type Parameters struct {
 	VehicleId           string            `json:"vehicleId"`
 }
 
-func (p *Parameters) Mode() uint {
+type Parameters struct {
+	ID               string   `json:"id"`
+	Timestamp        int64    `json:"timestamp"`
+	PaymentMode      uint     `json:"paymentMode"`
+	PaymentRoute     uint     `json:"paymentRoute"`
+	PaymentItinerary uint     `json:"paymentItinerary"`
+	RestrictiveList  []string `json:"restrictiveList"`
+	Timeout          int      `json:"timeout"`
+}
+
+func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
+	p.ID = params.ID
+	p.PaymentMode = params.Mode()
+	p.RestrictiveList = params.RestrictiveList()
+	p.Timeout = params.Timeout()
+	p.Timestamp = params.Timestamp
+	return p
+}
+
+func (p *PlatformParameters) Mode() uint {
 	if p.Props == nil {
 		return 0
 	}
@@ -34,7 +53,7 @@ func (p *Parameters) Mode() uint {
 	return uint(res)
 }
 
-func (p *Parameters) RestrictiveList() []string {
+func (p *PlatformParameters) RestrictiveList() []string {
 	if p.Props == nil {
 		return nil
 	}
@@ -51,7 +70,7 @@ func (p *Parameters) RestrictiveList() []string {
 	return result
 }
 
-func (p *Parameters) Timeout() int {
+func (p *PlatformParameters) Timeout() int {
 	if p.Props == nil {
 		return 0
 	}

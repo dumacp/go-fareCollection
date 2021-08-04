@@ -93,6 +93,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.evs = eventstream.NewEventStream()
 		}
 		subscribe(ctx, a.evs)
+		if a.itineraryMap != nil && ctx.Sender() != nil {
+			ctx.Respond(&MsgMap{Data: a.itineraryMap})
+		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetModes{})
 		ctx.Send(ctx.Self(), &MsgGetRoutes{})
@@ -227,7 +230,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgPublish:
 		if a.evs != nil {
-			a.evs.Publish(&MsgMap{Data: a.itineraryMap})
+			if a.itineraryMap != nil {
+				a.evs.Publish(&MsgMap{Data: a.itineraryMap})
+			}
 		}
 	case *MsgGetMap:
 		if ctx.Sender() != nil {
@@ -284,6 +289,7 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 			rootctx.Send(self, &MsgGetInDB{})
 		case <-t2:
 			rootctx.Send(self, &MsgTick{})
+			rootctx.Send(self, &MsgPublish{})
 		case <-t1.C:
 			rootctx.Send(self, &MsgTick{})
 		case <-quit:

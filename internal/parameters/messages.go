@@ -12,3 +12,4 @@ type MsgParameters struct {
 type MsgSubscribe struct {
 }
 type MsgPublish struct{}
+type MsgGetInDB struct{}

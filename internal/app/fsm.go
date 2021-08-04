@@ -96,8 +96,12 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 		beforeEvent(eError): func(e *fsm.Event) {
 			a.lastTime = time.Now()
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].([]string); ok {
-					a.ctx.Send(a.pidGraph, &graph.MsgError{Value: v})
+				switch v := e.Args[0].(type) {
+				case error:
+					var err *ErrorShowInScreen
+					if errors.As(v, &err) {
+						a.ctx.Send(a.pidGraph, &graph.MsgError{Value: err.Value})
+					}
 				}
 			}
 			a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
@@ -151,7 +155,7 @@ func (a *Actor) RunFSM() {
 					case error:
 						err = x
 					default:
-						err = errors.New("Unknown panic")
+						err = errors.New("unknown panic")
 					}
 					time.Sleep(3 * time.Second)
 				}
@@ -176,17 +180,17 @@ func (a *Actor) RunFSM() {
 					f.Event(eWait)
 				case sDetectTag:
 				case sValidationCard:
-					if time.Now().Add(-5 * time.Second).After(a.lastTime) {
+					if time.Now().Add(-time.Duration(a.timeout) * time.Millisecond).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}
 				case sValidationQR:
-					if time.Now().Add(-5 * time.Second).After(a.lastTime) {
+					if time.Now().Add(-time.Duration(a.timeout) * time.Millisecond).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}
 				case sError:
-					if time.Now().Add(-5 * time.Second).After(a.lastTime) {
+					if time.Now().Add(-time.Duration(a.timeout) * time.Millisecond).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}

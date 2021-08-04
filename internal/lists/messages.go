@@ -7,7 +7,8 @@ type MsgGetListsInDB struct{}
 type MsgGetLists struct{}
 
 type MsgGetListById struct {
-	ID string
+	ID   string
+	Code string
 }
 type MsgWatchList struct {
 	ID string

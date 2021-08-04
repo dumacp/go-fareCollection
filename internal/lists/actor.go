@@ -18,7 +18,7 @@ type Actor struct {
 	userHttp   string
 	passHttp   string
 	url        string
-	watchLists []string
+	watchLists map[string]string
 	listMap    map[string]*List
 	listInfo   map[string]*ListElement
 	db         *actor.PID
@@ -102,23 +102,23 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetLists{})
-		if len(a.watchLists) > 0 {
-			for _, listid := range a.watchLists {
-				ctx.Send(ctx.Self(), &MsgGetListById{ID: listid})
-			}
-		}
 	case *MsgWatchList:
-		if a.listInfo == nil {
-			ctx.Send(ctx.Self(), &MsgGetLists{})
-		}
 		if a.watchLists == nil {
-			a.watchLists = make([]string, 0)
+			a.watchLists = make(map[string]string)
 		}
-		a.watchLists = append(a.watchLists, msg.ID)
-		if _, ok := a.listInfo[msg.ID]; !ok {
+		if _, ok := a.watchLists[msg.ID]; ok {
 			break
 		}
-		ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ID].Code})
+		a.watchLists[msg.ID] = msg.ID
+		if a.listInfo == nil {
+			ctx.Send(ctx.Self(), &MsgGetLists{})
+			break
+		}
+		if _, ok := a.listInfo[msg.ID]; !ok {
+			ctx.Send(ctx.Self(), &MsgGetLists{})
+			break
+		}
+		ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ID].ID, Code: msg.ID})
 	case *MsgVerifyInList:
 		func() {
 			response := &MsgVerifyInListResponse{
@@ -140,7 +140,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 			list, ok := a.listMap[msg.ListID]
 			if !ok {
 				if _, ok := a.listInfo[msg.ListID]; ok {
-					ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ListID].ID})
+					ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ListID].ID, Code: msg.ListID})
+				} else {
+					ctx.Send(ctx.Self(), &MsgGetLists{})
 				}
 				// ctx.Send(ctx.Self(), &MsgGetLists{})
 				return
@@ -176,7 +178,34 @@ func (a *Actor) Receive(ctx actor.Context) {
 		for _, v := range result {
 			a.listInfo[v.Code] = v
 		}
+		if len(a.watchLists) > 0 {
+			for _, listCode := range a.watchLists {
+				if _, ok := a.listInfo[listCode]; !ok {
+					continue
+				}
+				ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[listCode].ID, Code: listCode})
+			}
+		}
 	case *MsgGetListById:
+		//Verify UpdateAt
+		if a.listMap != nil {
+			/**
+			for k, v := range a.listMap {
+				logs.LogBuild.Printf("listMap: %s, %+v, metadata: %+v", k, v, v.Metadata)
+			}
+			for k, v := range a.listInfo {
+				logs.LogBuild.Printf("listInfo: %s, %+v", k, v)
+			}
+			/**/
+			if list, ok := a.listMap[msg.Code]; ok {
+				if v, ok := a.listInfo[msg.Code]; ok {
+					logs.LogBuild.Printf("updateAt: %d, %d", v.UpdatedAt, list.Metadata.UpdatedAt)
+					if v.UpdatedAt <= list.Metadata.UpdatedAt {
+						break
+					}
+				}
+			}
+		}
 		url := fmt.Sprintf("%s/%s", a.url, msg.ID)
 		resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
 		if err != nil {

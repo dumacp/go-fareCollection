@@ -13,6 +13,8 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/graph"
 	"github.com/dumacp/go-fareCollection/internal/itinerary"
+	"github.com/dumacp/go-fareCollection/internal/lists"
+	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
@@ -33,6 +35,7 @@ type Actor struct {
 	pidReader    *actor.PID
 	pidQR        *actor.PID
 	pidFare      *actor.PID
+	pidList      *actor.PID
 	inputs       int
 	fmachine     *fsm.FSM
 	lastTime     time.Time
@@ -43,6 +46,8 @@ type Actor struct {
 	lastRand     int
 	actualRand   int
 	itineraryMap itinerary.ItineraryMap
+	params       *parameters.Parameters
+	timeout      int
 }
 
 func NewActor() actor.Actor {
@@ -56,9 +61,12 @@ func NewActor() actor.Actor {
 
 func (a *Actor) Receive(ctx actor.Context) {
 	a.ctx = ctx
+	logs.LogBuild.Printf("Message arrived in appActor: %s, %T, %s",
+		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 		if err := func() error {
+			// a.params = new(parameters.Parameters)
 			propsGrpah := actor.PropsFromProducer(graph.NewActor)
 			pidGrpah, err := ctx.SpawnNamed(propsGrpah, "graph-actor")
 			if err != nil {
@@ -111,8 +119,18 @@ func (a *Actor) Receive(ctx actor.Context) {
 		// 	}
 	case *itinerary.MsgMap:
 		a.itineraryMap = msg.Data
+	case *parameters.MsgParameters:
+		a.params = msg.Data
+		a.timeout = a.params.Timeout
+		if a.pidList != nil {
+			for _, list := range a.params.RestrictiveList {
+				ctx.Send(a.pidList, &lists.MsgWatchList{ID: list})
+			}
+		}
 	case *messages.RegisterFareActor:
 		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
+	case *messages.RegisterListActor:
+		a.pidList = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.MsgPayment:
 
 		/**/
@@ -154,6 +172,24 @@ func (a *Actor) Receive(ctx actor.Context) {
 			paym = mplus.ParseToPayment(msg.Uid, mcard)
 			a.mcard = paym
 			logs.LogBuild.Printf("tag map parse: %+v", paym)
+			//TODO: List
+			for _, list := range a.params.RestrictiveList {
+				resList, err := ctx.RequestFuture(a.pidList, &lists.MsgVerifyInList{
+					ListID: list,
+					ID:     []int64{int64(paym.ID())},
+				}, 60*time.Millisecond).Result()
+				if err != nil {
+					logs.LogWarn.Println(err)
+				}
+				switch v := resList.(type) {
+				case *lists.MsgVerifyInListResponse:
+					if len(v.ID) > 0 {
+						logs.LogWarn.Printf("WARN!!! id in LIST: %d", v.ID)
+						return NewErrorScreen("tarjeta bloqueada")
+					}
+				}
+			}
+
 			lastFares := make(map[int64]int)
 			hs := paym.Historical()
 			for _, v := range hs {
@@ -165,16 +201,22 @@ func (a *Actor) Receive(ctx actor.Context) {
 				LastFarePolicies: lastFares,
 				ProfileID:        int(paym.ProfileID()),
 				ItineraryID:      157,
-				ModeID:           1,
-				RouteID:          77,
-				FromItineraryID:  int(hs[len(hs)-1].ItineraryID()),
+				// ModeID:           1,
+				RouteID:         77,
+				FromItineraryID: int(hs[len(hs)-1].ItineraryID()),
+			}
+			if a.params != nil {
+				getFare.ModeID = int(a.params.PaymentMode)
+				//TODO: get ids by QR
+				// getFare.RouteID = int(a.params.PaymentRoute)
+				// getFare.ItineraryID = int(a.params.PaymentItinerary)
 			}
 
 			//TODO: farePID?
 			if a.pidFare == nil {
 				return errors.New("pidFare not found")
 			}
-			resFare, err := ctx.RequestFuture(a.pidFare, getFare, 100*time.Millisecond).Result()
+			resFare, err := ctx.RequestFuture(a.pidFare, getFare, 30*time.Millisecond).Result()
 			if err != nil {
 				return err
 			}
@@ -196,10 +238,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 					//Send Msg Error Balance
 
 					if balanceErr, ok := err.(*payment.ErrorBalanceValue); ok {
-						a.fmachine.Event(eError, []string{`Saldo insuficiente`, fmt.Sprintf("%.02f", balanceErr.Balance)})
+						return NewErrorScreen("saldo insuficiente", fmt.Sprintf("%.02f", balanceErr.Balance))
+						// a.fmachine.Event(eError, []string{`Saldo insuficiente`, fmt.Sprintf("%.02f", balanceErr.Balance)})
 						// ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: fmt.Sprintf("%.02f", balanceErr.Balance)})
 					} else {
-						a.fmachine.Event(eError, []string{`Saldo insuficiente`, ""})
+						return NewErrorScreen("saldo insuficiente")
+						// a.fmachine.Event(eError, []string{`Saldo insuficiente`, ""})
 						// ctx.Send(a.pidGraph, &graph.MsgBalanceError{Value: ""})
 					}
 					// a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
@@ -229,11 +273,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			ctx.Request(ctx.Sender(), &messages.MsgWritePayment{Uid: msg.Uid, Updates: update})
 			return nil
+			// return NewErrorScreen("saldo insuficiente", "1000")
 		}(); err != nil {
-			a.fmachine.Event(eError, 1200)
+			a.fmachine.Event(eError, err)
 			logs.LogError.Println(err)
 		}
-	case messages.MsgWritePaymentError:
+	case *messages.MsgWritePaymentError:
+		a.fmachine.Event(eError, NewErrorScreen("vuelva a ubicar la tarjeta\nerror de escritura"))
+		logs.LogError.Printf("error de escritura, uid: %d, err: %s", msg.Uid, msg.Error)
 
 	case *messages.MsgWritePaymentResponse:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})

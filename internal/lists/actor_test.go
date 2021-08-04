@@ -36,9 +36,13 @@ func TestNewActor(t *testing.T) {
 				rootctx: rootctx,
 				pid:     pid,
 				messages: []interface{}{
-					&MsgGetLists{},
-					&MsgGetListById{ID: "6b7c067b-8f58-45f1-b70c-a1cd402c26e5"},
-					&MsgVerifyInList{ListID: "LIST001", ID: []int64{44913149217}},
+					// &MsgGetLists{},
+					// &MsgGetListById{ID: "6b7c067b-8f58-45f1-b70c-a1cd402c26e5"},
+					// &MsgVerifyInList{ListID: "LIST001", ID: []int64{44913149217}},
+					&MsgWatchList{ID: "PMLIST"},
+					&MsgVerifyInList{ListID: "PMLIST", ID: []int64{44913149217, 423155168}},
+					&MsgVerifyInList{ListID: "PMLIST", ID: []int64{44913149217, 423155168}},
+					&MsgGetListById{ID: "904e7c85-08f4-47de-bd88-71458b9e2faf", Code: "PMLIST"},
 				},
 			},
 		},
@@ -53,8 +57,10 @@ func TestNewActor(t *testing.T) {
 						t.Logf("ids in list: %v", resp)
 					}
 				}
+				time.Sleep(1 * time.Second)
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(3 * time.Second)
+
 		})
 	}
 }

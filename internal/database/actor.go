@@ -116,7 +116,7 @@ func (a *dbActor) CloseState(ctx actor.Context) {
 }
 
 func (a *dbActor) WaitState(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrive in datab (WaitState): %s, %T", ctx.Message(), ctx.Message())
+	logs.LogBuild.Printf("Message arrive in datab (WaitState): %s, %T, %s", ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *MsgOpenDB:
 		if ctx.Sender() != nil {

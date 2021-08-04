@@ -43,7 +43,7 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrived in fareActor: %+v, %T, %s",
+	logs.LogBuild.Printf("Message arrived in fareActor: %s, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
@@ -160,15 +160,16 @@ func (a *Actor) Receive(ctx actor.Context) {
 				LastFare:        make([]*FareNode, 0),
 			}
 			if msg.FromItineraryID > 0 {
-				if a.itineraryMap == nil ||
-					a.itineraryMap[msg.ItineraryID] == nil {
-					logs.LogError.Printf("itinerary not found")
-					if a.pidItinerary != nil {
-						ctx.Request(a.pidItinerary, &itinerary.MsgGetMap{})
-					}
-				} else {
+				if a.itineraryMap != nil &&
+					a.itineraryMap[msg.ItineraryID] != nil {
 					q.FromModeID = a.itineraryMap[msg.ItineraryID].ModePaymentMediumCode
 					q.FromRouteID = a.itineraryMap[msg.ItineraryID].RoutePaymentMediumCode
+				} else {
+					logs.LogError.Println("itinerary not found")
+					//TODO: ?
+					// if a.pidItinerary != nil {
+					// 	ctx.Request(a.pidItinerary, &itinerary.MsgGetMap{})
+					// }
 				}
 			}
 			keySort := make([]int64, 0)
