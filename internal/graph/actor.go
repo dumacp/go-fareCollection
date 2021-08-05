@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
-	"github.com/dumacp/go-fareCollection/internal/comm/pubsub"
+	"github.com/dumacp/go-fareCollection/internal/pubsub"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
 
@@ -25,11 +25,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 	logs.LogBuild.Printf("%s - msg: %+v, type: %T", ctx.Self().GetId(), ctx.Message(), ctx.Message())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
-		if err := pubsub.Init(); err != nil {
-			logs.LogError.Println(err)
-			time.Sleep(3 * time.Second)
-			panic(err)
-		}
+		// if err := pubsub.Init(); err != nil {
+		// 	logs.LogError.Println(err)
+		time.Sleep(3 * time.Second)
+		// 	panic(err)
+		// }
 	case *MsgWaitTag:
 		screen1 := &Screen{
 			ID:  1,
