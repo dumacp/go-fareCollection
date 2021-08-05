@@ -46,3 +46,7 @@ message RegisterListActor{
 	string addr = 1;
    string id = 2;
 }
+message RegisterGPSActor{
+	string addr = 1;
+   string id = 2;
+}

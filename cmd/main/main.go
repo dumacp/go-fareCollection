@@ -12,9 +12,11 @@ import (
 	appreader "github.com/dumacp/go-appliance-contactless/pkg/app"
 	"github.com/dumacp/go-fareCollection/internal/app"
 	"github.com/dumacp/go-fareCollection/internal/fare"
+	"github.com/dumacp/go-fareCollection/internal/gps"
 	"github.com/dumacp/go-fareCollection/internal/itinerary"
 	"github.com/dumacp/go-fareCollection/internal/lists"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
+	"github.com/dumacp/go-fareCollection/internal/pubsub"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/dumacp/smartcard/multiiso"
@@ -37,6 +39,15 @@ func main() {
 	logs.LogBuild.Println("debug log")
 
 	ctx := actor.NewActorSystem().Root
+
+	pubsub.Init(ctx)
+
+	propsGps := actor.PropsFromProducer(gps.NewActor)
+
+	pidGps, err := ctx.SpawnNamed(propsGps, "gps-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
 
 	propsFare := actor.PropsFromProducer(fare.NewActor)
 	pidFare, err := ctx.SpawnNamed(propsFare, "fare-actor")
@@ -89,6 +100,7 @@ func main() {
 
 	readerActor.Subscribe(pidApp)
 
+	ctx.Send(pidApp, &messages.RegisterGPSActor{Addr: pidGps.Address, Id: pidGps.Id})
 	ctx.Send(pidApp, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
 	ctx.Send(pidApp, &messages.RegisterListActor{Addr: pidList.Address, Id: pidList.Id})
 	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidFare)

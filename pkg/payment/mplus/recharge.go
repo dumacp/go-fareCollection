@@ -2,6 +2,7 @@ package mplus
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/pkg/payment"
@@ -29,6 +30,12 @@ func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
 	p.updateMap[fmt.Sprintf("%s_%d", ConsecutivoTransaccionRecarga, h.Index())] = h.ConsecutiveID()
 	p.updateMap[fmt.Sprintf("%s_%d", TipoTransaccion, h.Index())] = h.TypeTransaction()
 	p.updateMap[fmt.Sprintf("%s_%d", ValorTransaccionRecarga, h.Index())] = h.Value()
+
+	sort.SliceStable(p.recharged,
+		func(i, j int) bool {
+			return p.recharged[i].TimeTransaction().Before(p.recharged[j].TimeTransaction())
+		},
+	)
 }
 
 func (p *mplus) Recharged() []payment.HistoricalRecharge {

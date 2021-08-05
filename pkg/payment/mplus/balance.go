@@ -2,6 +2,7 @@ package mplus
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/pkg/payment"
@@ -66,6 +67,12 @@ func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) error 
 
 	//Consecutive is a VALUE (int) in tag
 	p.updateMap[ConsecutivoTarjeta] = int(p.consecutive + 1)
+
+	sort.Slice(p.historical,
+		func(i, j int) bool {
+			return p.historical[i].TimeTransaction().Before(p.historical[j].TimeTransaction())
+		},
+	)
 
 	return nil
 

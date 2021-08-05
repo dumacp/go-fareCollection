@@ -69,7 +69,8 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 		case k == PERFIL:
 			m.profileID, _ = value.(uint)
 		case k == ConsecutivoTarjeta:
-			m.consecutive, _ = value.(uint)
+			v, _ := value.(int)
+			m.consecutive = uint(v)
 		case k == BLOQUEO:
 			v, _ := value.(int)
 			if v > 0 {
