@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/google/uuid"
 
 	"github.com/dumacp/go-fareCollection/internal/buzzer"
 	"github.com/dumacp/go-fareCollection/internal/fare"
@@ -18,6 +19,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
+	"github.com/dumacp/go-fareCollection/internal/usostransporte"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 	"github.com/dumacp/go-fareCollection/pkg/payment/mplus"
@@ -38,11 +40,13 @@ type Actor struct {
 	pidFare   *actor.PID
 	pidList   *actor.PID
 	pidGps    *actor.PID
+	pidUso    *actor.PID
 	inputs    int
 	fmachine  *fsm.FSM
 	lastTime  time.Time
 	ctx       actor.Context
 	mcard     payment.Payment
+	rawcard   map[string]string
 	// updates        map[string]interface{}
 	chNewRand      chan int
 	lastRand       int
@@ -138,6 +142,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.pidList = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.RegisterGPSActor:
 		a.pidGps = actor.NewPID(msg.Addr, msg.Id)
+	case *messages.RegisterUSOActor:
+		a.pidUso = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.MsgPayment:
 		/**/
 		jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
@@ -182,7 +188,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 				logs.LogInfo.Printf("rewrite try, uid: %d", msg.Uid)
 				return a.mcard.Updates(), nil
 			}
+			paym.SetRawDataBefore(msg.GetRaw())
 			a.mcard = paym
+			a.rawcard = msg.Raw
 			logs.LogBuild.Printf("tag map parse: %+v", paym)
 			//TODO: List
 			for _, list := range a.params.RestrictiveList {
@@ -304,59 +312,72 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Request(ctx.Sender(), &messages.MsgWritePayment{Uid: msg.Uid, Updates: updateValue})
 	case *messages.MsgWritePaymentError:
 		a.lastWriteError = msg.Uid
+		a.mcard.SetRawDataAfter(msg.GetRaw())
 		a.fmachine.Event(eError, NewErrorScreen("error de escritura", "vuelva a ubicar la tarjeta"))
 		logs.LogError.Printf("error de escritura, uid: %d, err: %s", msg.Uid, msg.Error)
 
 	case *messages.MsgWritePaymentResponse:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, a.mcard.Balance())
-		go func() {
-			tID := a.mcard.Consecutive()
-			// if !ok {
-			// 	logs.LogError.Println("seq is not INT")
-			// }
-			id := a.mcard.ID()
-			// if !ok {
-			// 	logs.LogError.Println("\"name\" is not STRING")
-			// }
-			card := make(map[string]interface{})
-			for k, v := range a.mcard.Data() {
-				card[k] = v
+		a.mcard.SetRawDataAfter(msg.GetRaw())
+
+		// if !ok {
+		// 	logs.LogError.Println("seq is not INT")
+		// }
+		cardid := a.mcard.ID()
+		uid := msg.Uid
+		// if !ok {
+		// 	logs.LogError.Println("\"name\" is not STRING")
+		// }
+		// card := make(map[string]interface{})
+		// for k, v := range a.mcard.Data() {
+		// 	card[k] = v
+		// }
+		// for k, v := range a.mcard.Updates() {
+		// 	card[k] = v
+		// }
+		coord := ""
+		if a.pidGps != nil {
+			res, err := ctx.RequestFuture(a.pidGps, &gps.MsgGetGps{}, 10*time.Millisecond).Result()
+			if err != nil {
+				logs.LogWarn.Println(err)
 			}
-			for k, v := range a.mcard.Updates() {
-				card[k] = v
-			}
-			coord := ""
-			if a.pidGps != nil {
-				res, err := ctx.RequestFuture(a.pidGps, &gps.MsgGetGps{}, 10*time.Millisecond).Result()
-				if err != nil {
-					logs.LogWarn.Println(err)
+			switch v := res.(type) {
+			case *gps.MsgGPS:
+				if v.Data != nil {
+					coord = string(v.Data)
+					logs.LogBuild.Printf("coord: %s", coord)
 				}
-				switch v := res.(type) {
-				case *gps.MsgGPS:
-					if v.Data != nil {
-						coord = string(v.Data)
-						logs.LogBuild.Printf("coord: %s", coord)
-					}
-				}
 			}
-			// go func() {
-			SendUsoTAG(fmt.Sprintf("%d", id), int(tID+1), card, a.mcard.Data(), []float64{0, 0}, time.Now())
-			// if err != nil {
-			// 	logs.LogError.Printf("POST error: %s", err)
-			// 	return
-			// }
-			// logs.LogInfo.Printf("response platform: %s", response)
-			// }()
-		}()
-	// case *MsgTagWriteError:
-	// 	if err := func() error {
-	// 		//Send Msg Write error
-	// 		defer ctx.Send(nil, nil)
-	// 		return nil
-	// 	}(); err != nil {
-	// 		logs.LogError.Println(err)
-	// 	}
+		}
+		id := uuid.NewUUID()
+		uso := &usostransporte.UsoTransporte{
+			ID:                    id,
+			PaymentMediumTypeCode: 2,
+			PaymentMediumId:       int(cardid),
+			MediumID:              uid,
+			FareCode:              int(a.mcard.FareID()),
+			RawDataPrev:           a.mcard.RawDataBefore(),
+			RawDataAfter:          a.mcard.RawDataAfter(),
+			Error: &usostransporte.Error{
+				Name: "null",
+				Desc: "null",
+				Code: 0,
+			},
+			Coord: coord,
+		}
+		ctx.Send(usostransporte.MsgUso{
+			Data: uso,
+		})
+		// hex.EncodeToString()
+		// go func() {
+		// SendUsoTAG(fmt.Sprintf("%d", id), int(tID+1), card, a.mcard.Data(), []float64{0, 0}, time.Now())
+		// if err != nil {
+		// 	logs.LogError.Printf("POST error: %s", err)
+		// 	return
+		// }
+		// logs.LogInfo.Printf("response platform: %s", response)
+		// }()
 	case *qr.MsgNewCodeQR:
 		logs.LogBuild.Printf("NewQR: %s", msg.Value)
 		v, err := DecodeQR(msg.Value)

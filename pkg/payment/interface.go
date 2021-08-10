@@ -50,10 +50,13 @@ type Payment interface {
 	Updates() map[string]interface{}
 	RawDataBefore() interface{}
 	RawDataAfter() interface{}
+	FareID() uint
 
 	AddRecharge(value int, deviceID, typeT, consecutive uint)
 	AddBalance(value int, deviceID, fareID, itineraryID uint) error
 	SetProfile(uint)
+	SetRawDataBefore(interface{})
+	SetRawDataAfter(interface{})
 	// IncConsecutive()
 	SetLock()
 }

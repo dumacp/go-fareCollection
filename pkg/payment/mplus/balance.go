@@ -9,6 +9,7 @@ import (
 )
 
 func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) error {
+	p.fareID = fareID
 	if p.balance <= 0 && value < 0 {
 		return &payment.ErrorBalanceValue{Balance: float64(p.balance), Cost: float64(value)}
 	}

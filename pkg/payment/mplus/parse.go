@@ -28,6 +28,7 @@ type mplus struct {
 	rawDataAfter  interface{}
 	actualMap     map[string]interface{}
 	updateMap     map[string]interface{}
+	fareID        uint
 }
 
 // func extractInt(data interface{}) int {

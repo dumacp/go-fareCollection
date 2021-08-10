@@ -2,8 +2,11 @@ package qr
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"time"
@@ -128,19 +131,34 @@ func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 			case sOpen:
 				config := &serial.Config{
 					Name: portSerial,
-					Baud: 9600,
+					Baud: 19200,
 					//ReadTimeout: time.Second * 3,
 				}
 				var err error
 				succ := false
-				for range []int{1, 2, 3} {
+				for baud := range []int{19200, 9600, 19200} {
+					config.Baud = baud
 					port, err = serial.OpenPort(config)
 					if err != nil {
 						time.Sleep(2 * time.Second)
 						continue
 					}
-					succ = true
-					break
+					if _, err = port.Write([]byte("?")); err != nil {
+						time.Sleep(2 * time.Second)
+						continue
+					}
+					buff := make([]byte, 1)
+					if _, err = port.Read(buff); err != nil {
+						if errors.Is(err, io.EOF) && bytes.Contains(buff, []byte("!")) {
+							succ = true
+							break
+						}
+						break
+					}
+					if bytes.Contains(buff, []byte("!")) {
+						succ = true
+						break
+					}
 				}
 				if !succ {
 					return err
@@ -149,30 +167,45 @@ func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 				f.Event(eRead)
 			case sRead:
 
-				v, err := reader.ReadBytes(0x0D)
-				if err != nil {
-					logs.LogError.Printf("QR read error: %s", err)
-					if !errors.Is(err, io.EOF) {
-						f.Event(eError)
-						break
+				if err := func() error {
+					v, err := reader.ReadBytes(0x0D)
+					if err != nil {
+						if !errors.Is(err, io.EOF) {
+							f.Event(eError)
+							return fmt.Errorf("QR read error: %s", err)
+						}
+						return nil
 					}
-					break
-				}
-				// code := base64.RawStdEncoding.EncodeToString(v)
-				if lastRead == string(v) {
-					if time.Now().Add(-5 * time.Second).Before(lastTime) {
-						break
+					// code := base64.RawStdEncoding.EncodeToString(v)
+					if lastRead == string(v) {
+						if time.Now().Add(-5 * time.Second).Before(lastTime) {
+							return nil
+						}
 					}
+					lastTime = time.Now()
+					lastRead = string(v)
+					logs.LogBuild.Printf("QR read: %s", v)
+					data, err := base64.StdEncoding.DecodeString(string(v))
+					if err != nil {
+						return fmt.Errorf("QR error: %w", err)
+					}
+					mess := struct {
+						Type  string          `json:"t"`
+						Value json.RawMessage `json:"v"`
+					}{}
+					if err := json.Unmarshal(data, &mess); err != nil {
+						return fmt.Errorf("QR error: %w", err)
+					}
+					switch mess.Type {
+					case "conf":
+
+					case "":
+					}
+					ctx.Send(ctx.Self(), &MsgNewCodeQR{Value: data})
+					return nil
+				}(); err != nil {
+					logs.LogError.Println(err)
 				}
-				lastTime = time.Now()
-				lastRead = string(v)
-				logs.LogBuild.Printf("QR read: %s", v)
-				data, err := base64.StdEncoding.DecodeString(string(v))
-				if err != nil {
-					logs.LogWarn.Printf("QR error: %s", err)
-					break
-				}
-				ctx.Send(ctx.Self(), &MsgNewCodeQR{Value: data})
 			case sClose:
 			}
 			time.Sleep(10 * time.Millisecond)
