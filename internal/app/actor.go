@@ -1,10 +1,11 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -41,6 +42,8 @@ type Actor struct {
 	pidList   *actor.PID
 	pidGps    *actor.PID
 	pidUso    *actor.PID
+	pidParams *actor.PID
+	pidSam    *actor.PID
 	inputs    int
 	fmachine  *fsm.FSM
 	lastTime  time.Time
@@ -48,10 +51,10 @@ type Actor struct {
 	mcard     payment.Payment
 	rawcard   map[string]string
 	// updates        map[string]interface{}
-	chNewRand      chan int
-	lastRand       int
-	actualRand     int
-	itineraryMap   itinerary.ItineraryMap
+	chNewRand  chan int
+	lastRand   int
+	actualRand int
+	// itineraryMap   itinerary.ItineraryMap
 	params         *parameters.Parameters
 	timeout        int
 	lastWriteError uint64
@@ -97,7 +100,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return err
 			}
 			a.pidPicto = pidPicto
-			propsQR := actor.PropsFromProducer(qr.NewActor)
+			qrActor := qr.NewActor()
+			propsQR := actor.PropsFromFunc(qrActor.Receive)
 			pidQR, err := ctx.SpawnNamed(propsQR, "qr-actor")
 			if err != nil {
 				time.Sleep(3 * time.Second)
@@ -127,8 +131,18 @@ func (a *Actor) Receive(ctx actor.Context) {
 		// 		logs.LogError.Println(err)
 		// 	}
 	case *itinerary.MsgMap:
-		a.itineraryMap = msg.Data
+		// a.itineraryMap = msg.Data
+		if a.pidParams != nil {
+			ctx.Send(a.pidParams, msg)
+		}
+	case *parameters.ConfigParameters:
+		if a.pidParams != nil {
+			ctx.Send(a.pidParams, msg)
+		}
 	case *parameters.MsgParameters:
+		if ctx.Sender() != nil {
+			a.pidParams = ctx.Sender()
+		}
 		a.params = msg.Data
 		a.timeout = a.params.Timeout
 		if a.pidList != nil {
@@ -144,6 +158,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.pidGps = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.RegisterUSOActor:
 		a.pidUso = actor.NewPID(msg.Addr, msg.Id)
+	case *messages.RegisterSAMActor:
+		a.pidSam = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.MsgPayment:
 		/**/
 		jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
@@ -193,20 +209,22 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.rawcard = msg.Raw
 			logs.LogBuild.Printf("tag map parse: %+v", paym)
 			//TODO: List
-			for _, list := range a.params.RestrictiveList {
-				resList, err := ctx.RequestFuture(a.pidList, &lists.MsgVerifyInList{
-					ListID: list,
-					ID:     []int64{int64(paym.ID())},
-				}, 60*time.Millisecond).Result()
-				if err != nil {
-					logs.LogWarn.Println(err)
-				}
-				switch v := resList.(type) {
-				case *lists.MsgVerifyInListResponse:
-					if len(v.ID) > 0 {
-						logs.LogWarn.Printf("WARN!!! id in LIST: %d", v.ID)
-						// return nil, NewErrorScreen("tarjeta bloqueada")
-						// return NewErrorScreen("saldo insuficiente", fmt.Sprintf("%.02f", 1850.00))
+			if a.params != nil {
+				for _, list := range a.params.RestrictiveList {
+					resList, err := ctx.RequestFuture(a.pidList, &lists.MsgVerifyInList{
+						ListID: list,
+						ID:     []int64{int64(paym.ID())},
+					}, 60*time.Millisecond).Result()
+					if err != nil {
+						logs.LogWarn.Println(err)
+					}
+					switch v := resList.(type) {
+					case *lists.MsgVerifyInListResponse:
+						if len(v.ID) > 0 {
+							logs.LogWarn.Printf("WARN!!! id in LIST: %d", v.ID)
+							return nil, NewErrorScreen("tarjeta bloqueada", "tarjeta en listas restrictivas")
+							// return NewErrorScreen("saldo insuficiente", fmt.Sprintf("%.02f", 1850.00))
+						}
 					}
 				}
 			}
@@ -350,9 +368,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 			}
 		}
-		id := uuid.NewUUID()
+		id, err := uuid.NewUUID()
+		if err != nil {
+			logs.LogError.Printf("uuid err: %s", err)
+			break
+		}
 		uso := &usostransporte.UsoTransporte{
-			ID:                    id,
+			ID:                    id.String(),
 			PaymentMediumTypeCode: 2,
 			PaymentMediumId:       int(cardid),
 			MediumID:              uid,
@@ -366,7 +388,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			},
 			Coord: coord,
 		}
-		ctx.Send(usostransporte.MsgUso{
+		ctx.Send(a.pidUso, usostransporte.MsgUso{
 			Data: uso,
 		})
 		// hex.EncodeToString()
@@ -379,54 +401,103 @@ func (a *Actor) Receive(ctx actor.Context) {
 		// logs.LogInfo.Printf("response platform: %s", response)
 		// }()
 	case *qr.MsgNewCodeQR:
-		logs.LogBuild.Printf("NewQR: %s", msg.Value)
-		v, err := DecodeQR(msg.Value)
-		if err != nil {
-			logs.LogError.Println(err)
-		}
-		logs.LogBuild.Printf("NewQR: %s, [% X]", v, v)
-
-		//TODO: fix this bug
-		newv := make([]byte, 0)
-		for i := range v {
-			if v[i] > 0x20 {
-				newv = append(newv, v[i])
+		if err := func() error {
+			mdec := &messages.Decrypt{
+				Data:     msg.Value[4:],
+				DivInput: msg.Value[0:4],
 			}
-		}
+			logs.LogBuild.Printf("QR crypt: [% X], len: %d; [% X], len: %d",
+				mdec.Data, len(mdec.Data), mdec.DivInput, len(mdec.DivInput))
 
-		res := new(QrCode)
-		if err := json.Unmarshal(newv, res); err != nil {
+			var data []byte
+
+			res, err := ctx.RequestFuture(a.pidSam, mdec, time.Millisecond*600).Result()
+			if err != nil {
+				return err
+			}
+			switch v := res.(type) {
+			case *messages.DecryptResponse:
+				if v.Data == nil {
+					return errors.New("QR decrypt data is empty")
+				}
+				data = v.Data
+				logs.LogBuild.Printf("QR decrypt: %s, [%X]", data, data)
+			}
+
+			mess := struct {
+				Type  string          `json:"t"`
+				Value json.RawMessage `json:"v"`
+			}{}
+			data = bytes.TrimRight(data, "\x00")
+			if err := json.Unmarshal(data, &mess); err != nil {
+				return fmt.Errorf("QR error: %w", err)
+			}
+			var sendMsg interface{}
+			switch strings.ToUpper(mess.Type) {
+			case "DCIT":
+				sendMsg = new(parameters.ConfigParameters)
+				if err := json.Unmarshal(mess.Value, sendMsg); err != nil {
+					return fmt.Errorf("QR error: %w", err)
+				}
+				ctx.Send(a.pidParams, sendMsg)
+			case "USET":
+				sendMsg = new(parameters.ConfigParameters)
+				if err := json.Unmarshal(mess.Value, sendMsg); err != nil {
+					return fmt.Errorf("QR error: %w", err)
+				}
+			}
+			return nil
+		}(); err != nil {
 			logs.LogError.Printf("QR error: %s", err)
-			break
 		}
-		pin, err := strconv.Atoi(res.Pin)
-		if err != nil {
-			logs.LogError.Printf("QR error: %s", err)
-			break
-		}
-		if pin != a.lastRand && pin != a.actualRand {
-			a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
-			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
-			//TODO: cahngeeee!!!
-			go func() {
-				time.Sleep(2 * time.Second)
-				a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
-			}()
-			logs.LogError.Printf("QR error: PIN is invalid")
-			break
-		}
-		a.fmachine.Event(eQRValidated, fmt.Sprintf("%d", res.TransactionID))
-		// ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: fmt.Sprintf("%d", res.TransactionID)})
+		// logs.LogBuild.Printf("NewQR: %s", msg.Value)
+		// v, err := DecodeQR(msg.Value)
+		// if err != nil {
+		// 	logs.LogError.Println(err)
+		// }
+		// logs.LogBuild.Printf("NewQR: %s, [% X]", v, v)
 
-		select {
-		case a.chNewRand <- 1:
-		case <-time.After(100 * time.Millisecond):
-		}
-		a.lastRand = a.actualRand
-		a.actualRand = -1
+		// //TODO: fix this bug
+		// newv := make([]byte, 0)
+		// for i := range v {
+		// 	if v[i] > 0x20 {
+		// 		newv = append(newv, v[i])
+		// 	}
+		// }
 
-		// go func() {
-		SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
+		// res := new(QrCode)
+		// if err := json.Unmarshal(newv, res); err != nil {
+		// 	logs.LogError.Printf("QR error: %s", err)
+		// 	break
+		// }
+		// pin, err := strconv.Atoi(res.Pin)
+		// if err != nil {
+		// 	logs.LogError.Printf("QR error: %s", err)
+		// 	break
+		// }
+		// if pin != a.lastRand && pin != a.actualRand {
+		// 	a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
+		// 	a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
+		// 	//TODO: cahngeeee!!!
+		// 	go func() {
+		// 		time.Sleep(2 * time.Second)
+		// 		a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
+		// 	}()
+		// 	logs.LogError.Printf("QR error: PIN is invalid")
+		// 	break
+		// }
+		// a.fmachine.Event(eQRValidated, fmt.Sprintf("%d", res.TransactionID))
+		// // ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: fmt.Sprintf("%d", res.TransactionID)})
+
+		// select {
+		// case a.chNewRand <- 1:
+		// case <-time.After(100 * time.Millisecond):
+		// }
+		// a.lastRand = a.actualRand
+		// a.actualRand = -1
+
+		// // go func() {
+		// SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
 		// 	if err != nil {
 		// 		logs.LogError.Printf("POST error: %s", err)
 		// 		return

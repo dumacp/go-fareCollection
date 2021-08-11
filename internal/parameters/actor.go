@@ -9,6 +9,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/eventstream"
 	"github.com/dumacp/go-fareCollection/internal/database"
+	"github.com/dumacp/go-fareCollection/internal/itinerary"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
@@ -34,6 +35,7 @@ type Actor struct {
 	evs                *eventstream.EventStream
 	parameters         *Parameters
 	platformParameters *PlatformParameters
+	itineraryMap       itinerary.ItineraryMap
 }
 
 func NewActor(id string) actor.Actor {
@@ -82,6 +84,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 	case *actor.Stopping:
 		close(a.quit)
+	case *itinerary.MsgMap:
+		a.itineraryMap = msg.Data
 	case *MsgSubscribe:
 		if a.evs == nil {
 			a.evs = eventstream.NewEventStream()
@@ -93,6 +97,39 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
+	case *ConfigParameters:
+		logs.LogBuild.Printf("parse params: %+v", msg)
+		if a.parameters == nil {
+			a.parameters = new(Parameters)
+		}
+		a.parameters.FromConfig(msg)
+		if msg.PaymentItinerary > 0 {
+			if a.itineraryMap != nil {
+				if v, ok := a.itineraryMap[msg.PaymentItinerary]; ok {
+					if v.RoutePaymentMediumCode > 0 {
+						a.parameters.PaymentRoute = v.RoutePaymentMediumCode
+					}
+				}
+			} else {
+				logs.LogBuild.Printf("parse params itimap: %+v", a.itineraryMap)
+			}
+		}
+		data, err := json.Marshal(a.parameters)
+		if err != nil {
+			logs.LogWarn.Printf("parse params err: %s", err)
+			break
+		}
+
+		if a.db != nil {
+			ctx.Send(a.db, &database.MsgUpdateData{
+				Database:   databaseName,
+				Collection: collectionNameData,
+				ID:         a.parameters.ID,
+				Data:       data,
+			})
+		}
+		logs.LogBuild.Printf("params: %+v", a.parameters)
+		ctx.Send(ctx.Self(), &MsgPublish{})
 	case *MsgGetParameters:
 		isUpdateMap := false
 		if err := func() error {

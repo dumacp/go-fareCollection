@@ -17,12 +17,18 @@ type PlatformParameters struct {
 	VehicleId           string            `json:"vehicleId"`
 }
 
+type ConfigParameters struct {
+	Expiration       int64 `json:"exp"`
+	VerificationCode int64 `json:"c"`
+	PaymentItinerary int   `json:"id"`
+}
+
 type Parameters struct {
 	ID               string   `json:"id"`
 	Timestamp        int64    `json:"timestamp"`
-	PaymentMode      uint     `json:"paymentMode"`
-	PaymentRoute     uint     `json:"paymentRoute"`
-	PaymentItinerary uint     `json:"paymentItinerary"`
+	PaymentMode      int      `json:"paymentMode"`
+	PaymentRoute     int      `json:"paymentRoute"`
+	PaymentItinerary int      `json:"paymentItinerary"`
 	RestrictiveList  []string `json:"restrictiveList"`
 	Timeout          int      `json:"timeout"`
 }
@@ -36,7 +42,15 @@ func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
 	return p
 }
 
-func (p *PlatformParameters) Mode() uint {
+func (p *Parameters) FromConfig(params *ConfigParameters) *Parameters {
+	// if params.Expiration > time.Now().UnixNano()/1000_000 {
+	// 	return p
+	// }
+	p.PaymentItinerary = params.PaymentItinerary
+	return p
+}
+
+func (p *PlatformParameters) Mode() int {
 	if p.Props == nil {
 		return 0
 	}
@@ -50,7 +64,7 @@ func (p *PlatformParameters) Mode() uint {
 		return 0
 	}
 
-	return uint(res)
+	return int(res)
 }
 
 func (p *PlatformParameters) RestrictiveList() []string {

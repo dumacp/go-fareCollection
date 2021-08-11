@@ -4,14 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"time"
 
-	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
 	"github.com/tarm/serial"
@@ -36,6 +34,8 @@ const (
 	eRead    = "eRead"
 	eError   = "eError"
 )
+
+// var keyQR = []byte{0x06, 0xB3, 0x0E, 0x65, 0x72, 0x3E, 0x3C, 0x96, 0x48, 0x8E, 0xD4, 0x05, 0xF1, 0x24, 0x2E, 0x88}
 
 // func beforeEvent(event string) string {
 // 	return fmt.Sprintf("before_%s", event)
@@ -90,7 +90,7 @@ func NewFSM(callbacks fsm.Callbacks) *fsm.FSM {
 	return rfsm
 }
 
-func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
+func (a *Actor) RunFSM() {
 
 	if err := func() (errr error) {
 		defer func() {
@@ -114,29 +114,22 @@ func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 		lastTime := time.Now().Add(300 * time.Second)
 
 		for {
-
-			select {
-			case <-chQuit:
-				return nil
-			default:
+			if lastState != a.fmachine.Current() {
+				lastState = a.fmachine.Current()
+				logs.LogBuild.Printf("current state QR reader: %s", a.fmachine.Current())
 			}
 
-			if lastState != f.Current() {
-				lastState = f.Current()
-				logs.LogBuild.Printf("current state QR reader: %s", f.Current())
-			}
-
-			switch f.Current() {
+			switch a.fmachine.Current() {
 			case sStart:
 			case sOpen:
 				config := &serial.Config{
 					Name: portSerial,
-					Baud: 19200,
+					Baud: 9600,
 					//ReadTimeout: time.Second * 3,
 				}
 				var err error
 				succ := false
-				for baud := range []int{19200, 9600, 19200} {
+				for _, baud := range []int{9600, 19200, 9600} {
 					config.Baud = baud
 					port, err = serial.OpenPort(config)
 					if err != nil {
@@ -147,7 +140,7 @@ func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 						time.Sleep(2 * time.Second)
 						continue
 					}
-					buff := make([]byte, 1)
+					buff := make([]byte, 16)
 					if _, err = port.Read(buff); err != nil {
 						if errors.Is(err, io.EOF) && bytes.Contains(buff, []byte("!")) {
 							succ = true
@@ -164,14 +157,14 @@ func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 					return err
 				}
 				reader = bufio.NewReader(port)
-				f.Event(eRead)
+				a.fmachine.Event(eRead)
 			case sRead:
 
 				if err := func() error {
 					v, err := reader.ReadBytes(0x0D)
 					if err != nil {
 						if !errors.Is(err, io.EOF) {
-							f.Event(eError)
+							a.fmachine.Event(eError)
 							return fmt.Errorf("QR read error: %s", err)
 						}
 						return nil
@@ -189,19 +182,33 @@ func RunFSM(ctx actor.Context, chQuit chan int, f *fsm.FSM) {
 					if err != nil {
 						return fmt.Errorf("QR error: %w", err)
 					}
-					mess := struct {
-						Type  string          `json:"t"`
-						Value json.RawMessage `json:"v"`
-					}{}
-					if err := json.Unmarshal(data, &mess); err != nil {
-						return fmt.Errorf("QR error: %w", err)
-					}
-					switch mess.Type {
-					case "conf":
 
-					case "":
-					}
-					ctx.Send(ctx.Self(), &MsgNewCodeQR{Value: data})
+					// block, err := aes.NewCipher(keyQR)
+					// if err != nil {
+					// 	return fmt.Errorf("QR error: %w", err)
+					// }
+					// modeD := cipher.NewCBCDecrypter(block)
+					// mess := struct {
+					// 	Type  string          `json:"t"`
+					// 	Value json.RawMessage `json:"v"`
+					// }{}
+					// if err := json.Unmarshal(data, &mess); err != nil {
+					// 	return fmt.Errorf("QR error: %w", err)
+					// }
+					// var sendMsg interface{}
+					// switch strings.ToUpper(mess.Type) {
+					// case "CONF":
+					// 	sendMsg = new(parameters.ConfigParameters)
+					// 	if err := json.Unmarshal(data, sendMsg); err != nil {
+					// 		return fmt.Errorf("QR error: %w", err)
+					// 	}
+					// case "USET":
+					// 	sendMsg = new(parameters.ConfigParameters)
+					// 	if err := json.Unmarshal(data, sendMsg); err != nil {
+					// 		return fmt.Errorf("QR error: %w", err)
+					// 	}
+					// }
+					a.ctx.Send(a.ctx.Parent(), &MsgNewCodeQR{Value: data})
 					return nil
 				}(); err != nil {
 					logs.LogError.Println(err)

@@ -2,11 +2,13 @@ package usostransporte
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/internal/database"
+	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
 
@@ -28,30 +30,11 @@ type Actor struct {
 	url        string
 	id         string
 	db         *actor.PID
-	// evs        *eventstream.EventStream
 }
 
 func NewActor(id string) actor.Actor {
 	return &Actor{id: id}
 }
-
-// func subscribe(ctx actor.Context, evs *eventstream.EventStream) {
-// 	rootctx := ctx.ActorSystem().Root
-// 	pid := ctx.Sender()
-// 	self := ctx.Self()
-
-// 	fn := func(evt interface{}) {
-// 		rootctx.RequestWithCustomSender(pid, evt, self)
-// 	}
-// 	sub := evs.Subscribe(fn)
-// 	sub.WithPredicate(func(evt interface{}) bool {
-// 		switch evt.(type) {
-// 		case nil:
-// 			return true
-// 		}
-// 		return false
-// 	})
-// }
 
 func (a *Actor) Receive(ctx actor.Context) {
 	logs.LogBuild.Printf("Message arrived in paramActor: %s, %T, %s",
@@ -77,41 +60,28 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 	case *actor.Stopping:
 		close(a.quit)
-	// case *MsgSubscribe:
-	// 	if a.evs == nil {
-	// 		a.evs = eventstream.NewEventStream()
-	// 	}
-	// 	subscribe(ctx, a.evs)
-
-	// 	if a.parameters != nil && ctx.Sender() != nil {
-	// 		ctx.Respond(&MsgParameters{Data: a.parameters})
-	// 	}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
 
-	// case *MsgPublish:
-	// 	if a.evs != nil {
-	// 		if a.parameters != nil {
-	// 			a.evs.Publish(&MsgParameters{Data: a.parameters})
-	// 		}
-	// 	}
 	case *MsgUso:
 		if err := func() error {
 			uso := msg.Data
-			if err := send(uso); err != nil {
+			data, err := json.Marshal(uso)
+			if err != nil {
+				return fmt.Errorf("send uso err: %w", err)
+			}
+			if resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, data); err != nil {
 				if a.db != nil {
-					data, err2 := json.Marshal(uso)
-					if err != nil {
-						return err2
-					}
 					ctx.Send(a.db, &database.MsgUpdateData{
 						Database:   databaseName,
 						Collection: collectionNameData,
 						ID:         uso.ID,
 						Data:       data,
 					})
+				} else {
+					return fmt.Errorf("send uso (db is empty) err post: %s, %w", resp, err)
 				}
-				return err
+				return fmt.Errorf("send uso err post: %s, %w", resp, err)
 			}
 			return nil
 		}(); err != nil {
@@ -137,15 +107,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			switch msg.Collection {
 			case collectionNameData:
-				uso := new(UsoTransporte)
-				if err := json.Unmarshal(msg.Data, uso); err != nil {
-					return err
-				}
-				if err := send(uso); err != nil {
-					return err
+
+				resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, msg.Data)
+				if err != nil {
+					return fmt.Errorf("send uso err: %s, %w", resp, err)
 				}
 				ctx.Send(a.db, &database.MsgDeleteData{
-					ID:         uso.ID,
+					ID:         msg.ID,
 					Database:   databaseName,
 					Collection: collectionNameData,
 				})

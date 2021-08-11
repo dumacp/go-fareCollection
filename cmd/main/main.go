@@ -25,11 +25,15 @@ import (
 var debug bool
 var logstd bool
 var id string
+var serial string
+var baud int
 
 func init() {
 	flag.BoolVar(&debug, "debug", false, "debug?")
 	flag.BoolVar(&logstd, "logStd", false, "logs in stderr?")
 	flag.StringVar(&id, "id", "OMZV7-0001", "device ID")
+	flag.StringVar(&serial, "serial", "/dev/ttymxc4", "device path")
+	flag.IntVar(&baud, "baud", 460800, "device baud speed")
 }
 
 func main() {
@@ -87,7 +91,7 @@ func main() {
 	}
 
 	// init contactless reader
-	dev, err := multiiso.NewDevice("/dev/ttyUSB0", 115200, time.Millisecond*600)
+	dev, err := multiiso.NewDevice(serial, baud, time.Millisecond*600)
 	if err != nil {
 		logs.LogError.Fatalln(err)
 	}
@@ -103,9 +107,13 @@ func main() {
 	ctx.Send(pidApp, &messages.RegisterGPSActor{Addr: pidGps.Address, Id: pidGps.Id})
 	ctx.Send(pidApp, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
 	ctx.Send(pidApp, &messages.RegisterListActor{Addr: pidList.Address, Id: pidList.Id})
+	//TODO: change actor sam
+	ctx.Send(pidApp, &messages.RegisterSAMActor{Addr: readerActor.PID().Address, Id: readerActor.PID().Id})
+	//TODO: first param
+	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
+	time.Sleep(1 * time.Second)
 	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidFare)
 	// ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidApp)
-	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
 
 	finish := make(chan os.Signal, 1)
 	signal.Notify(finish, syscall.SIGINT)

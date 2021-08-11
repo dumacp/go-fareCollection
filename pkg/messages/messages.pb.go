@@ -573,6 +573,218 @@ func (x *RegisterGPSActor) GetId() string {
 	return ""
 }
 
+type RegisterUSOActor struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Addr string `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
+	Id   string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (x *RegisterUSOActor) Reset() {
+	*x = RegisterUSOActor{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RegisterUSOActor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterUSOActor) ProtoMessage() {}
+
+func (x *RegisterUSOActor) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterUSOActor.ProtoReflect.Descriptor instead.
+func (*RegisterUSOActor) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RegisterUSOActor) GetAddr() string {
+	if x != nil {
+		return x.Addr
+	}
+	return ""
+}
+
+func (x *RegisterUSOActor) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type RegisterSAMActor struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Addr string `protobuf:"bytes,1,opt,name=addr,proto3" json:"addr,omitempty"`
+	Id   string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+}
+
+func (x *RegisterSAMActor) Reset() {
+	*x = RegisterSAMActor{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RegisterSAMActor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterSAMActor) ProtoMessage() {}
+
+func (x *RegisterSAMActor) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterSAMActor.ProtoReflect.Descriptor instead.
+func (*RegisterSAMActor) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RegisterSAMActor) GetAddr() string {
+	if x != nil {
+		return x.Addr
+	}
+	return ""
+}
+
+func (x *RegisterSAMActor) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type Decrypt struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Data     []byte `protobuf:"bytes,1,opt,name=Data,proto3" json:"Data,omitempty"`
+	DivInput []byte `protobuf:"bytes,2,opt,name=DivInput,proto3" json:"DivInput,omitempty"`
+}
+
+func (x *Decrypt) Reset() {
+	*x = Decrypt{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Decrypt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Decrypt) ProtoMessage() {}
+
+func (x *Decrypt) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Decrypt.ProtoReflect.Descriptor instead.
+func (*Decrypt) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Decrypt) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *Decrypt) GetDivInput() []byte {
+	if x != nil {
+		return x.DivInput
+	}
+	return nil
+}
+
+type DecryptResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Data []byte `protobuf:"bytes,1,opt,name=Data,proto3" json:"Data,omitempty"`
+}
+
+func (x *DecryptResponse) Reset() {
+	*x = DecryptResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_messages_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DecryptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecryptResponse) ProtoMessage() {}
+
+func (x *DecryptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_messages_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecryptResponse.ProtoReflect.Descriptor instead.
+func (*DecryptResponse) Descriptor() ([]byte, []int) {
+	return file_messages_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DecryptResponse) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_messages_proto protoreflect.FileDescriptor
 
 var file_messages_proto_rawDesc = []byte{
@@ -654,10 +866,24 @@ var file_messages_proto_rawDesc = []byte{
 	0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x47, 0x50, 0x53, 0x41, 0x63, 0x74, 0x6f, 0x72, 0x12,
 	0x12, 0x0a, 0x04, 0x61, 0x64, 0x64, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x61,
 	0x64, 0x64, 0x72, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x02, 0x69, 0x64, 0x42, 0x32, 0x5a, 0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
-	0x6d, 0x2f, 0x64, 0x75, 0x6d, 0x61, 0x63, 0x70, 0x2f, 0x67, 0x6f, 0x2d, 0x66, 0x61, 0x72, 0x65,
-	0x43, 0x6f, 0x6c, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x6d,
-	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x02, 0x69, 0x64, 0x22, 0x36, 0x0a, 0x10, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x55,
+	0x53, 0x4f, 0x41, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x12, 0x0a, 0x04, 0x61, 0x64, 0x64, 0x72, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x61, 0x64, 0x64, 0x72, 0x12, 0x0e, 0x0a, 0x02, 0x69,
+	0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x22, 0x36, 0x0a, 0x10, 0x52,
+	0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x53, 0x41, 0x4d, 0x41, 0x63, 0x74, 0x6f, 0x72, 0x12,
+	0x12, 0x0a, 0x04, 0x61, 0x64, 0x64, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x61,
+	0x64, 0x64, 0x72, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x02, 0x69, 0x64, 0x22, 0x39, 0x0a, 0x07, 0x44, 0x65, 0x63, 0x72, 0x79, 0x70, 0x74, 0x12, 0x12,
+	0x0a, 0x04, 0x44, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x44, 0x61,
+	0x74, 0x61, 0x12, 0x1a, 0x0a, 0x08, 0x44, 0x69, 0x76, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0c, 0x52, 0x08, 0x44, 0x69, 0x76, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x22, 0x25,
+	0x0a, 0x0f, 0x44, 0x65, 0x63, 0x72, 0x79, 0x70, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x12, 0x0a, 0x04, 0x44, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52,
+	0x04, 0x44, 0x61, 0x74, 0x61, 0x42, 0x32, 0x5a, 0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x64, 0x75, 0x6d, 0x61, 0x63, 0x70, 0x2f, 0x67, 0x6f, 0x2d, 0x66, 0x61,
+	0x72, 0x65, 0x43, 0x6f, 0x6c, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x70, 0x6b, 0x67,
+	0x2f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x33,
 }
 
 var (
@@ -672,7 +898,7 @@ func file_messages_proto_rawDescGZIP() []byte {
 	return file_messages_proto_rawDescData
 }
 
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_messages_proto_goTypes = []interface{}{
 	(*Value)(nil),                   // 0: messages.Value
 	(*MsgPayment)(nil),              // 1: messages.MsgPayment
@@ -682,18 +908,22 @@ var file_messages_proto_goTypes = []interface{}{
 	(*RegisterFareActor)(nil),       // 5: messages.RegisterFareActor
 	(*RegisterListActor)(nil),       // 6: messages.RegisterListActor
 	(*RegisterGPSActor)(nil),        // 7: messages.RegisterGPSActor
-	nil,                             // 8: messages.MsgPayment.DataEntry
-	nil,                             // 9: messages.MsgPayment.RawEntry
-	nil,                             // 10: messages.MsgWritePayment.UpdatesEntry
-	nil,                             // 11: messages.MsgWritePaymentResponse.RawEntry
-	nil,                             // 12: messages.MsgWritePaymentError.RawEntry
+	(*RegisterUSOActor)(nil),        // 8: messages.RegisterUSOActor
+	(*RegisterSAMActor)(nil),        // 9: messages.RegisterSAMActor
+	(*Decrypt)(nil),                 // 10: messages.Decrypt
+	(*DecryptResponse)(nil),         // 11: messages.DecryptResponse
+	nil,                             // 12: messages.MsgPayment.DataEntry
+	nil,                             // 13: messages.MsgPayment.RawEntry
+	nil,                             // 14: messages.MsgWritePayment.UpdatesEntry
+	nil,                             // 15: messages.MsgWritePaymentResponse.RawEntry
+	nil,                             // 16: messages.MsgWritePaymentError.RawEntry
 }
 var file_messages_proto_depIdxs = []int32{
-	8,  // 0: messages.MsgPayment.data:type_name -> messages.MsgPayment.DataEntry
-	9,  // 1: messages.MsgPayment.raw:type_name -> messages.MsgPayment.RawEntry
-	10, // 2: messages.MsgWritePayment.updates:type_name -> messages.MsgWritePayment.UpdatesEntry
-	11, // 3: messages.MsgWritePaymentResponse.raw:type_name -> messages.MsgWritePaymentResponse.RawEntry
-	12, // 4: messages.MsgWritePaymentError.raw:type_name -> messages.MsgWritePaymentError.RawEntry
+	12, // 0: messages.MsgPayment.data:type_name -> messages.MsgPayment.DataEntry
+	13, // 1: messages.MsgPayment.raw:type_name -> messages.MsgPayment.RawEntry
+	14, // 2: messages.MsgWritePayment.updates:type_name -> messages.MsgWritePayment.UpdatesEntry
+	15, // 3: messages.MsgWritePaymentResponse.raw:type_name -> messages.MsgWritePaymentResponse.RawEntry
+	16, // 4: messages.MsgWritePaymentError.raw:type_name -> messages.MsgWritePaymentError.RawEntry
 	0,  // 5: messages.MsgPayment.DataEntry.value:type_name -> messages.Value
 	0,  // 6: messages.MsgWritePayment.UpdatesEntry.value:type_name -> messages.Value
 	7,  // [7:7] is the sub-list for method output_type
@@ -805,6 +1035,54 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
+		file_messages_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RegisterUSOActor); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RegisterSAMActor); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Decrypt); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_messages_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DecryptResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_messages_proto_msgTypes[0].OneofWrappers = []interface{}{
 		(*Value_UintValue)(nil),
@@ -820,7 +1098,7 @@ func file_messages_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_messages_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

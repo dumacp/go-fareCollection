@@ -53,3 +53,19 @@ message RegisterGPSActor{
 	string addr = 1;
    string id = 2;
 }
+message RegisterUSOActor{
+	string addr = 1;
+   string id = 2;
+}
+message RegisterSAMActor{
+	string addr = 1;
+   string id = 2;
+}
+
+message Decrypt {
+	bytes Data = 1;
+	bytes DivInput = 2;
+}
+message DecryptResponse {
+	bytes Data = 1;
+}

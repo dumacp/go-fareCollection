@@ -87,3 +87,6 @@ func (p *mplus) Historical() []payment.Historical {
 func (p *mplus) Balance() int {
 	return p.balance
 }
+func (p *mplus) FareID() uint {
+	return p.fareID
+}
