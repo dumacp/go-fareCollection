@@ -40,6 +40,7 @@ type List struct {
 type PaymentMediumType struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
+	Code      string `json:"code"`
 	IdRegex   string `json:"idRegex"`
 	FlagRegex string `json:"flagRegex"`
 	Active    bool   `json:"active"`

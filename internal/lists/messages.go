@@ -13,6 +13,10 @@ type MsgGetListById struct {
 type MsgWatchList struct {
 	ID string
 }
+type MsgWatchListResponse struct {
+	ID                string
+	PaymentMediumType string
+}
 
 type MsgVerifyInList struct {
 	ListID string

@@ -18,7 +18,7 @@ message Value {
 
 message MsgPayment{
 	uint64  uid = 1;
-	uint32 type = 2;
+	string type = 2;
 	map<string, Value> data = 3;
    map<string, string> raw = 4;
 }

@@ -12,6 +12,7 @@ type MsgGetFare struct {
 type MsgResponseFare struct {
 	Fare         int
 	FarePolicyID int
+	ItineraryID  int
 }
 type MsgError struct {
 	Err string

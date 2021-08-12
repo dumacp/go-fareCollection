@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/gps"
 	"github.com/dumacp/go-fareCollection/internal/graph"
-	"github.com/dumacp/go-fareCollection/internal/itinerary"
 	"github.com/dumacp/go-fareCollection/internal/lists"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/picto"
@@ -55,9 +55,11 @@ type Actor struct {
 	lastRand   int
 	actualRand int
 	// itineraryMap   itinerary.ItineraryMap
-	params         *parameters.Parameters
-	timeout        int
-	lastWriteError uint64
+	params          *parameters.Parameters
+	listRestrictive map[string]string
+	timeout         int
+	lastWriteError  uint64
+	quit            chan int
 }
 
 func NewActor() actor.Actor {
@@ -65,11 +67,11 @@ func NewActor() actor.Actor {
 	a.newFSM(nil)
 	go a.RunFSM()
 	a.chNewRand = make(chan int)
-	go a.TickQR(a.chNewRand)
+	// go a.TickQR(a.chNewRand)
 	return a
 }
 
-var count = 0
+// var count = 0
 
 func (a *Actor) Receive(ctx actor.Context) {
 	a.ctx = ctx
@@ -116,6 +118,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		a.fmachine.Event(eStarted)
 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+		a.quit = make(chan int)
+		go tick(ctx, 60*time.Minute, a.quit)
 		// case *MsgTagDetected:
 		// 	if err := func() error {
 		// 		if a.actualTag == a.lastTag {
@@ -130,11 +134,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 		// 	}(); err != nil {
 		// 		logs.LogError.Println(err)
 		// 	}
-	case *itinerary.MsgMap:
-		// a.itineraryMap = msg.Data
-		if a.pidParams != nil {
-			ctx.Send(a.pidParams, msg)
-		}
+	// case *itinerary.MsgMap:
+	// 	// a.itineraryMap = msg.Data
+	// 	if a.pidParams != nil {
+	// 		ctx.Send(a.pidParams, msg)
+	// 	}
 	case *parameters.ConfigParameters:
 		if a.pidParams != nil {
 			ctx.Send(a.pidParams, msg)
@@ -150,6 +154,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 				ctx.Send(a.pidList, &lists.MsgWatchList{ID: list})
 			}
 		}
+	case *lists.MsgWatchListResponse:
+		if a.listRestrictive == nil {
+			a.listRestrictive = make(map[string]string)
+		}
+		a.listRestrictive[msg.ID] = msg.PaymentMediumType
 	case *messages.RegisterFareActor:
 		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.RegisterListActor:
@@ -210,7 +219,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 			logs.LogBuild.Printf("tag map parse: %+v", paym)
 			//TODO: List
 			if a.params != nil {
-				for _, list := range a.params.RestrictiveList {
+				for list, code := range a.listRestrictive {
+					if code != msg.GetType() {
+						continue
+					}
 					resList, err := ctx.RequestFuture(a.pidList, &lists.MsgVerifyInList{
 						ListID: list,
 						ID:     []int64{int64(paym.ID())},
@@ -445,6 +457,49 @@ func (a *Actor) Receive(ctx actor.Context) {
 				if err := json.Unmarshal(mess.Value, sendMsg); err != nil {
 					return fmt.Errorf("QR error: %w", err)
 				}
+				logs.LogBuild.Printf("NewQR: %s", msg.Value)
+				if err != nil {
+					return fmt.Errorf("QR error: %w", err)
+				}
+
+				res := new(QrCode)
+				if err := json.Unmarshal(newv, res); err != nil {
+					logs.LogError.Printf("QR error: %s", err)
+					break
+				}
+				pin, err := strconv.Atoi(res.Pin)
+				if err != nil {
+					logs.LogError.Printf("QR error: %s", err)
+					break
+				}
+				if pin != a.lastRand && pin != a.actualRand {
+					a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
+					a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
+					//TODO: cahngeeee!!!
+					go func() {
+						time.Sleep(2 * time.Second)
+						a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
+					}()
+					logs.LogError.Printf("QR error: PIN is invalid")
+					break
+				}
+				a.fmachine.Event(eQRValidated, fmt.Sprintf("%d", res.TransactionID))
+				// ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: fmt.Sprintf("%d", res.TransactionID)})
+
+				select {
+				case a.chNewRand <- 1:
+				case <-time.After(100 * time.Millisecond):
+				}
+				a.lastRand = a.actualRand
+				a.actualRand = -1
+
+				// go func() {
+				SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
+				if err != nil {
+					logs.LogError.Printf("POST error: %s", err)
+					return
+				}
+				logs.LogInfo.Printf("response platform: %s", response)
 			}
 			return nil
 		}(); err != nil {

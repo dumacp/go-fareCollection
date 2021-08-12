@@ -16,3 +16,4 @@ package app
 type MsgNewRand struct {
 	Value int
 }
+type MsgTick struct{}

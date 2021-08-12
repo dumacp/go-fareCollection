@@ -103,22 +103,35 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetLists{})
 	case *MsgWatchList:
-		if a.watchLists == nil {
-			a.watchLists = make(map[string]string)
-		}
-		if _, ok := a.watchLists[msg.ID]; ok {
-			break
-		}
-		a.watchLists[msg.ID] = msg.ID
-		if a.listInfo == nil {
-			ctx.Send(ctx.Self(), &MsgGetLists{})
-			break
-		}
-		if _, ok := a.listInfo[msg.ID]; !ok {
-			ctx.Send(ctx.Self(), &MsgGetLists{})
-			break
-		}
-		ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ID].ID, Code: msg.ID})
+		func() {
+			defer func() {
+				if ctx.Sender() != nil {
+					if v, ok := a.listMap[msg.ID]; ok {
+						ctx.Respond(&MsgWatchListResponse{
+							ID:                msg.ID,
+							PaymentMediumType: v.PaymentMediumCode.Code,
+						})
+					}
+				}
+			}()
+			if a.watchLists == nil {
+				a.watchLists = make(map[string]string)
+			}
+			if _, ok := a.watchLists[msg.ID]; ok {
+
+				return
+			}
+			a.watchLists[msg.ID] = msg.ID
+			if a.listInfo == nil {
+				ctx.Send(ctx.Self(), &MsgGetLists{})
+				return
+			}
+			if _, ok := a.listInfo[msg.ID]; !ok {
+				ctx.Send(ctx.Self(), &MsgGetLists{})
+				return
+			}
+			ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[msg.ID].ID, Code: msg.ID})
+		}()
 	case *MsgVerifyInList:
 		func() {
 			response := &MsgVerifyInListResponse{

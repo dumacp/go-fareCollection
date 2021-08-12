@@ -1,17 +1,17 @@
 package app
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"errors"
 	"math/rand"
 	"time"
+
+	"github.com/AsynkronIT/protoactor-go/actor"
 )
 
-const (
-	keyQr   = "5mYqX4wY4YfgtGSt"
-	timeout = 30
-)
+// const (
+// 	keyQr = "5mYqX4wY4YfgtGSt"
+// 	// timeout = 30
+// )
 
 var ErrorCipher = errors.New("Error in CIPHER")
 
@@ -22,36 +22,34 @@ type QrCode struct {
 	TransactionID int32  `json:"t"`
 }
 
-func (a *Actor) TickQR(ch <-chan int) {
+func tickQR(ctx actor.Context, quit, ch <-chan int) {
 
-	//TODO: add chquit
-	tick1 := time.NewTimer(5 * time.Second)
-	defer tick1.Stop()
+	timeout := 30 * time.Second
+	rootctx := ctx.ActorSystem().Root
+	self := ctx.Self()
+	t1 := time.NewTimer(5 * time.Second)
+	defer t1.Stop()
 
 	for {
 		select {
 		case <-ch:
-			if a.ctx != nil {
-				a.ctx.Send(a.ctx.Self(), &MsgNewRand{Value: int(NewCode())})
-			}
-			if !tick1.Stop() {
+			rootctx.Send(self, &MsgNewRand{Value: int(NewCode())})
+			if !t1.Stop() {
 				select {
-				case <-tick1.C:
+				case <-t1.C:
 				default:
 				}
 			}
-			tick1.Reset(timeout * time.Second)
-		case <-tick1.C:
-			if a.ctx != nil {
-				a.ctx.Send(a.ctx.Self(), &MsgNewRand{Value: int(NewCode())})
-			}
-			if !tick1.Stop() {
+			t1.Reset(timeout)
+		case <-t1.C:
+			rootctx.Send(self, &MsgNewRand{Value: int(NewCode())})
+			if !t1.Stop() {
 				select {
-				case <-tick1.C:
+				case <-t1.C:
 				default:
 				}
 			}
-			tick1.Reset(timeout * time.Second)
+			t1.Reset(timeout)
 		}
 	}
 }
@@ -66,19 +64,19 @@ func NewCode() int32 {
 	return v1 + v2
 }
 
-func DecodeQR(data []byte) ([]byte, error) {
-	key := []byte(keyQr)
-	iv := make([]byte, 16)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	dcrypt := cipher.NewCBCDecrypter(block, iv)
-	for len(data)%dcrypt.BlockSize() != 0 {
-		return nil, ErrorCipher
-	}
-	dts := make([]byte, len(data))
-	dcrypt.CryptBlocks(dts, data)
+// func DecodeQR(data []byte) ([]byte, error) {
+// 	key := []byte(keyQr)
+// 	iv := make([]byte, 16)
+// 	block, err := aes.NewCipher(key)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	dcrypt := cipher.NewCBCDecrypter(block, iv)
+// 	for len(data)%dcrypt.BlockSize() != 0 {
+// 		return nil, ErrorCipher
+// 	}
+// 	dts := make([]byte, len(data))
+// 	dcrypt.CryptBlocks(dts, data)
 
-	return dts, nil
-}
+// 	return dts, nil
+// }
