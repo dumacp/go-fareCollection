@@ -66,83 +66,85 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgGetFarePolicies:
 		//TODO:
 		//Get Fare Policies from platform
-		if err := func() error {
-			count := 30
-			numPages := 1000
-			// 			var paginationInput = `{
-			// "paginationInput": {
-			// 	"page": %d,
-			// 	"count": %d,
-			// 	"queryTotalResultCount": true
-			// 	}
-			// }`
-			actives := make(map[int]int)
-			for i := range make([]int, numPages) {
-				// dataToPagination := fmt.Sprintf(paginationInput, count, i)
-				filter := fmt.Sprintf(filterHttpQuery, count, i, true)
-				url := fmt.Sprintf("%s%s", a.url, filter)
-				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp,
-					nil)
-				if err != nil {
-					return err
-				}
-				logs.LogBuild.Printf("Get response: %s", resp)
-				var result = struct {
-					Listing               []*FareNode `json:"listing"`
-					QueryTotalResultCount int         `json:"queryTotalResultCount"`
-				}{}
-
-				if err := json.Unmarshal(resp, &result); err != nil {
-					return err
-				}
-
-				if a.farePolicies == nil {
-					a.farePolicies = make(map[int]*FareNode)
-				}
-				for _, fareNode := range result.Listing {
-
-					actives[fareNode.ID] = 0
-					if _, ok := a.farePolicies[fareNode.ID]; ok {
-						continue
+		go func(ctx actor.Context) {
+			if err := func() error {
+				count := 30
+				numPages := 1000
+				// 			var paginationInput = `{
+				// "paginationInput": {
+				// 	"page": %d,
+				// 	"count": %d,
+				// 	"queryTotalResultCount": true
+				// 	}
+				// }`
+				actives := make(map[int]int)
+				for i := range make([]int, numPages) {
+					// dataToPagination := fmt.Sprintf(paginationInput, count, i)
+					filter := fmt.Sprintf(filterHttpQuery, count, i, true)
+					url := fmt.Sprintf("%s%s", a.url, filter)
+					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp,
+						nil)
+					if err != nil {
+						return err
 					}
-					a.farePolicies[fareNode.ID] = fareNode
-					if a.db != nil {
-						v, err := json.Marshal(fareNode)
-						if err != nil {
+					logs.LogBuild.Printf("Get response: %s", resp)
+					var result = struct {
+						Listing               []*FareNode `json:"listing"`
+						QueryTotalResultCount int         `json:"queryTotalResultCount"`
+					}{}
+
+					if err := json.Unmarshal(resp, &result); err != nil {
+						return err
+					}
+
+					if a.farePolicies == nil {
+						a.farePolicies = make(map[int]*FareNode)
+					}
+					for _, fareNode := range result.Listing {
+
+						actives[fareNode.ID] = 0
+						if _, ok := a.farePolicies[fareNode.ID]; ok {
 							continue
 						}
-						ctx.Send(a.db, &database.MsgUpdateData{
-							Database:   databaseName,
-							Collection: collectionNameData,
-							ID:         fmt.Sprintf("%s:%d", fareNode.FarePolicyID, fareNode.ID),
-							Data:       v,
-						})
+						a.farePolicies[fareNode.ID] = fareNode
+						if a.db != nil {
+							v, err := json.Marshal(fareNode)
+							if err != nil {
+								continue
+							}
+							ctx.Send(a.db, &database.MsgUpdateData{
+								Database:   databaseName,
+								Collection: collectionNameData,
+								ID:         fmt.Sprintf("%s:%d", fareNode.FarePolicyID, fareNode.ID),
+								Data:       v,
+							})
+						}
+
 					}
-
-				}
-				if result.QueryTotalResultCount < count {
-					break
-				}
-			}
-
-			if a.db != nil {
-				for k, v := range a.farePolicies {
-					if _, ok := actives[k]; !ok {
-						ctx.Send(a.db, &database.MsgDeleteData{
-							ID:         v.FarePolicyID,
-							Database:   databaseName,
-							Collection: collectionNameData,
-						})
+					if result.QueryTotalResultCount < count {
+						break
 					}
 				}
-			}
 
-			a.fareMap = CreateTree(a.farePolicies)
-			logs.LogBuild.Printf("fare map: %#v", a.fareMap)
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
+				if a.db != nil {
+					for k, v := range a.farePolicies {
+						if _, ok := actives[k]; !ok {
+							ctx.Send(a.db, &database.MsgDeleteData{
+								ID:         v.FarePolicyID,
+								Database:   databaseName,
+								Collection: collectionNameData,
+							})
+						}
+					}
+				}
+
+				a.fareMap = CreateTree(a.farePolicies)
+				logs.LogBuild.Printf("fare map: %#v", a.fareMap)
+				return nil
+			}(); err != nil {
+				logs.LogError.Println(err)
+			}
+		}(ctx)
 	case *itinerary.MsgMap:
 		if ctx.Sender() != nil {
 			a.pidItinerary = ctx.Sender()
@@ -212,9 +214,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 		} else {
 			if ctx.Sender() != nil {
-				ctx.Respond(&MsgResponseFare{
+				ctx.Respond(&MsgFare{
 					Fare:         fare.Fare,
 					FarePolicyID: fare.ID,
+					// ItineraryID:  fare.ItineraryID,
 				})
 			}
 		}

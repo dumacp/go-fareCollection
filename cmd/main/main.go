@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,9 +20,11 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/lists"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/pubsub"
+	"github.com/dumacp/go-fareCollection/internal/usostransporte"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/dumacp/smartcard/multiiso"
+	"github.com/google/uuid"
 )
 
 var debug bool
@@ -67,6 +72,19 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
+	//TODO: get id from hostname?
+	varSplit := strings.Split(id, "-")
+	if len(varSplit) < 1 {
+		id = "0001"
+	}
+	idint, _ := strconv.Atoi(varSplit[len(varSplit)-1])
+
+	idbytes := make([]byte, 8)
+
+	binary.LittleEndian.PutUint64(idbytes, uint64(idint))
+	logs.LogBuild.Printf("nodeID: [% X]", idbytes[:6])
+	uuid.SetNodeID(idbytes[:6])
+
 	paramActor := parameters.NewActor(id)
 	propsParam := actor.PropsFromFunc(paramActor.Receive)
 
@@ -82,7 +100,14 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
-	appActor := app.NewActor()
+	propsUsos := actor.PropsFromProducer(usostransporte.NewActor)
+
+	pidUsos, err := ctx.SpawnNamed(propsUsos, "usos-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
+
+	appActor := app.NewActor(id)
 	propsApp := actor.PropsFromFunc(appActor.Receive)
 
 	pidApp, err := ctx.SpawnNamed(propsApp, "app-actor")
@@ -107,12 +132,14 @@ func main() {
 	ctx.Send(pidApp, &messages.RegisterGPSActor{Addr: pidGps.Address, Id: pidGps.Id})
 	ctx.Send(pidApp, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
 	ctx.Send(pidApp, &messages.RegisterListActor{Addr: pidList.Address, Id: pidList.Id})
+	ctx.Send(pidApp, &messages.RegisterUSOActor{Addr: pidUsos.Address, Id: pidUsos.Id})
 	//TODO: change actor sam
 	ctx.Send(pidApp, &messages.RegisterSAMActor{Addr: readerActor.PID().Address, Id: readerActor.PID().Id})
 	//TODO: first param
-	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
+	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidParam)
 	time.Sleep(1 * time.Second)
-	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidFare)
+	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
+
 	// ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidApp)
 
 	finish := make(chan os.Signal, 1)

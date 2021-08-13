@@ -5,5 +5,13 @@ func (p *mplus) SetRawDataBefore(data interface{}) {
 }
 
 func (p *mplus) SetRawDataAfter(data interface{}) {
-	p.rawDataBefore = data
+	p.rawDataAfter = data
+}
+
+func (p *mplus) RawDataBefore() interface{} {
+	return p.rawDataBefore
+}
+
+func (p *mplus) RawDataAfter() interface{} {
+	return p.rawDataAfter
 }

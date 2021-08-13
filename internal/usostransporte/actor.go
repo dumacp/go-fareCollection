@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	defaultURL         = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/dev-summary"
-	defaultUsername    = "dev.nebulae"
-	filterHttpQuery    = "?page=%d&count=%d&active=true"
+	defaultURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/fare-transaction"
+	defaultUsername = "dev.nebulae"
+	// filterHttpQuery    = "?page=%d&count=%d&active=true"
 	defaultPassword    = "uno.2.tres"
 	dbpath             = "/SD/boltdb/usosdb"
 	databaseName       = "usosdb"
@@ -28,12 +28,12 @@ type Actor struct {
 	userHttp   string
 	passHttp   string
 	url        string
-	id         string
-	db         *actor.PID
+	// id         string
+	db *actor.PID
 }
 
-func NewActor(id string) actor.Actor {
-	return &Actor{id: id}
+func NewActor() actor.Actor {
+	return &Actor{}
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
@@ -70,6 +70,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if err != nil {
 				return fmt.Errorf("send uso err: %w", err)
 			}
+			logs.LogInfo.Printf("USO: %s", data)
 			if resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, data); err != nil {
 				if a.db != nil {
 					ctx.Send(a.db, &database.MsgUpdateData{
@@ -82,6 +83,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 					return fmt.Errorf("send uso (db is empty) err post: %s, %w", resp, err)
 				}
 				return fmt.Errorf("send uso err post: %s, %w", resp, err)
+			} else {
+				logs.LogBuild.Printf("response set uso: %s", resp)
 			}
 			return nil
 		}(); err != nil {
@@ -94,7 +97,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Request(a.db, &database.MsgQueryData{
 			Database:   databaseName,
 			Collection: collectionNameData,
-			PrefixID:   a.id,
+			PrefixID:   "",
 			Reverse:    false,
 		})
 	case *database.MsgQueryResponse:

@@ -35,6 +35,7 @@ type HistoricalRecharge interface {
 }
 
 type Payment interface {
+	Type() string
 	UID() uint64
 	ID() uint
 	Historical() []Historical
@@ -52,8 +53,9 @@ type Payment interface {
 	RawDataAfter() interface{}
 	FareID() uint
 
+	ApplyFare(data interface{}) (interface{}, error)
 	AddRecharge(value int, deviceID, typeT, consecutive uint)
-	AddBalance(value int, deviceID, fareID, itineraryID uint) error
+	AddBalance(value int) error
 	SetProfile(uint)
 	SetRawDataBefore(interface{})
 	SetRawDataAfter(interface{})

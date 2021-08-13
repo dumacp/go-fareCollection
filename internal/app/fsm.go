@@ -63,10 +63,16 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			a.inputs++
 			value := ""
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].(int); ok {
-					// value = fmt.Sprintf("$%.02f", float64(v))
+				switch v := e.Args[0].(type) {
+				case int:
 					value = FormatSaldo(v)
+				case string:
+					value = v
 				}
+				// if v, ok := e.Args[0].(int); ok {
+				// 	// value = fmt.Sprintf("$%.02f", float64(v))
+				// 	value = FormatSaldo(v)
+				// }
 			}
 			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
 			a.ctx.Send(a.pidPicto, &picto.MsgPictoOK{})

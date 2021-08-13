@@ -131,56 +131,58 @@ func (a *Actor) Receive(ctx actor.Context) {
 		logs.LogBuild.Printf("params: %+v", a.parameters)
 		ctx.Send(ctx.Self(), &MsgPublish{})
 	case *MsgGetParameters:
-		isUpdateMap := false
-		if err := func() error {
-			url := fmt.Sprintf("%s/%s", a.url, a.id)
-			resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
-			if err != nil {
-				return err
-			}
-			logs.LogBuild.Printf("Get url: %s", url)
-			logs.LogBuild.Printf("Get response: %s", resp)
-			var result PlatformParameters
-			if err := json.Unmarshal(resp, &result); err != nil {
-				return err
-			}
-
-			if a.platformParameters == nil || a.platformParameters.Timestamp < result.Timestamp {
-
-				a.platformParameters = &result
-				if a.parameters == nil {
-					isUpdateMap = true
-					a.parameters = new(Parameters)
-				} else {
-					if a.parameters.Timestamp < result.Timestamp {
-						isUpdateMap = true
-					}
-				}
-				a.parameters.FromPlatform(&result)
-
-				data, err := json.Marshal(a.parameters)
+		go func(ctx actor.Context) {
+			isUpdateMap := false
+			if err := func() error {
+				url := fmt.Sprintf("%s/%s", a.url, a.id)
+				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
 				if err != nil {
-					isUpdateMap = false
 					return err
 				}
-				if a.db != nil && isUpdateMap {
-					ctx.Send(a.db, &database.MsgUpdateData{
-						Database:   databaseName,
-						Collection: collectionNameData,
-						ID:         a.parameters.ID,
-						Data:       data,
-					})
+				logs.LogBuild.Printf("Get url: %s", url)
+				logs.LogBuild.Printf("Get response: %s", resp)
+				var result PlatformParameters
+				if err := json.Unmarshal(resp, &result); err != nil {
+					return err
 				}
-			}
-			return nil
 
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
-		if isUpdateMap {
-			logs.LogBuild.Printf("params: %+v", a.parameters)
-			ctx.Send(ctx.Self(), &MsgPublish{})
-		}
+				if a.platformParameters == nil || a.platformParameters.Timestamp < result.Timestamp {
+
+					a.platformParameters = &result
+					if a.parameters == nil {
+						isUpdateMap = true
+						a.parameters = new(Parameters)
+					} else {
+						if a.parameters.Timestamp < result.Timestamp {
+							isUpdateMap = true
+						}
+					}
+					a.parameters.FromPlatform(&result)
+
+					data, err := json.Marshal(a.parameters)
+					if err != nil {
+						isUpdateMap = false
+						return err
+					}
+					if a.db != nil && isUpdateMap {
+						ctx.Send(a.db, &database.MsgUpdateData{
+							Database:   databaseName,
+							Collection: collectionNameData,
+							ID:         a.parameters.ID,
+							Data:       data,
+						})
+					}
+				}
+				return nil
+
+			}(); err != nil {
+				logs.LogError.Println(err)
+			}
+			if isUpdateMap {
+				logs.LogBuild.Printf("params: %+v", a.parameters)
+				ctx.Send(ctx.Self(), &MsgPublish{})
+			}
+		}(ctx)
 	case *MsgPublish:
 		if a.evs != nil {
 			if a.parameters != nil {

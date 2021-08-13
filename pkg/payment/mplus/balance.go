@@ -5,11 +5,56 @@ import (
 	"sort"
 	"time"
 
+	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 )
 
-func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) error {
-	p.fareID = fareID
+func (p *mplus) ApplyFare(data interface{}) (interface{}, error) {
+	switch f := data.(type) {
+	case *fare.MsgFare:
+		fareID := uint(f.FarePolicyID)
+		itineraryID := uint(f.ItineraryID)
+		deviceID := uint(f.DeviceID)
+
+		p.fareID = fareID
+		value := -(f.Fare)
+
+		if err := p.AddBalance(value); err != nil {
+			return nil, err
+		}
+		if len(p.historical) <= 0 {
+			p.historical = make([]payment.Historical, 0)
+			p.historical = append(p.historical, &historicalUse{})
+			p.historical[0].SetIndex(1)
+
+		}
+		p.historical[0].SetDeviceID(deviceID)
+		p.historical[0].SetFareID(fareID)
+		p.historical[0].SetItineraryID(itineraryID)
+		p.historical[0].SetTimeTransaction(time.Now())
+
+		h := p.historical[0]
+
+		p.updateMap[fmt.Sprintf("%s_%d", IDDispositivoUso, h.Index())] = h.DeviceID()
+		p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccion, h.Index())] = uint(h.TimeTransaction().Unix())
+		p.updateMap[fmt.Sprintf("%s_%d", FareID, h.Index())] = h.FareID()
+		p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.Index())] = h.ItineraryID()
+
+		//Consecutive is a VALUE (int) in tag
+		p.updateMap[ConsecutivoTarjeta] = int(p.consecutive + 1)
+
+		sort.Slice(p.historical,
+			func(i, j int) bool {
+				return p.historical[i].TimeTransaction().Before(p.historical[j].TimeTransaction())
+			},
+		)
+		return nil, nil
+	}
+	return nil, nil
+}
+
+func (p *mplus) AddBalance(value int) error {
+
 	if p.balance <= 0 && value < 0 {
 		return &payment.ErrorBalanceValue{Balance: float64(p.balance), Cost: float64(value)}
 	}
@@ -48,32 +93,6 @@ func (p *mplus) AddBalance(value int, deviceID, fareID, itineraryID uint) error 
 	}
 	p.updateMap[SaldoTarjeta] = saldoTarjeta
 	p.updateMap[SaldoTarjetaBackup] = saldoTarjetaBackup
-	if len(p.historical) <= 0 {
-		p.historical = make([]payment.Historical, 0)
-		p.historical = append(p.historical, &historicalUse{})
-		p.historical[0].SetIndex(1)
-
-	}
-	p.historical[0].SetDeviceID(deviceID)
-	p.historical[0].SetFareID(fareID)
-	p.historical[0].SetItineraryID(itineraryID)
-	p.historical[0].SetTimeTransaction(time.Now())
-
-	h := p.historical[0]
-
-	p.updateMap[fmt.Sprintf("%s_%d", IDDispositivoUso, h.Index())] = h.DeviceID()
-	p.updateMap[fmt.Sprintf("%s_%d", FechaTransaccion, h.Index())] = uint(h.TimeTransaction().Unix())
-	p.updateMap[fmt.Sprintf("%s_%d", FareID, h.Index())] = h.FareID()
-	p.updateMap[fmt.Sprintf("%s_%d", ItineraryID, h.Index())] = h.ItineraryID()
-
-	//Consecutive is a VALUE (int) in tag
-	p.updateMap[ConsecutivoTarjeta] = int(p.consecutive + 1)
-
-	sort.Slice(p.historical,
-		func(i, j int) bool {
-			return p.historical[i].TimeTransaction().Before(p.historical[j].TimeTransaction())
-		},
-	)
 
 	return nil
 

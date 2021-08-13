@@ -9,10 +9,11 @@ type MsgGetFare struct {
 	ModeID           int
 	FromItineraryID  int
 }
-type MsgResponseFare struct {
+type MsgFare struct {
 	Fare         int
 	FarePolicyID int
 	ItineraryID  int
+	DeviceID     int
 }
 type MsgError struct {
 	Err string

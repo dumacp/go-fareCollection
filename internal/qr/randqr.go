@@ -1,4 +1,4 @@
-package app
+package qr
 
 import (
 	"errors"

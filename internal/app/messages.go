@@ -13,7 +13,5 @@ package app
 // type MsgQRRead struct {
 // 	Data map[string]interface{}
 // }
-type MsgNewRand struct {
-	Value int
-}
+
 type MsgTick struct{}

@@ -101,7 +101,7 @@ func Subscribe(topic string, pid *actor.PID, parse func([]byte) interface{}) err
 
 func (ps *pubsubActor) subscribe(topic string, subs *subscribeMSG) error {
 	handler := func(client mqtt.Client, m mqtt.Message) {
-		logs.LogBuild.Printf("local topic -> %q", m.Topic())
+		// logs.LogBuild.Printf("local topic -> %q", m.Topic())
 		// logs.LogBuild.Printf("local payload - > %s", m.Payload())
 		m.Ack()
 		msg := subs.parse(m.Payload())
@@ -148,7 +148,6 @@ func (ps *pubsubActor) Receive(ctx actor.Context) {
 		logs.LogError.Println("Stopped, actor and its children are stopped")
 	case *actor.Restarting:
 		logs.LogError.Println("Restarting, actor is about to restart")
-
 	}
 }
 

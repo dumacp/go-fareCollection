@@ -12,6 +12,7 @@ import (
 )
 
 type mplus struct {
+	ttype         string
 	uid           uint64
 	id            uint
 	historical    []payment.Historical
@@ -44,7 +45,7 @@ type mplus struct {
 // 	return result //, nil
 // }
 
-func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
+func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payment.Payment {
 
 	// minorNumberInt32 := -2147483648
 
@@ -53,6 +54,7 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 
 	m := &mplus{}
 	m.uid = uid
+	m.ttype = ttype
 	m.actualMap = mapa
 
 	for k, value := range mapa {
@@ -183,6 +185,10 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 	return m
 }
 
+func (p *mplus) Type() string {
+	return p.ttype
+}
+
 func (p *mplus) Data() map[string]interface{} {
 	return p.actualMap
 }
@@ -215,12 +221,6 @@ func (p *mplus) VersionLayout() uint {
 }
 func (p *mplus) Lock() bool {
 	return p.lock
-}
-func (p *mplus) RawDataBefore() interface{} {
-	return nil
-}
-func (p *mplus) RawDataAfter() interface{} {
-	return nil
 }
 
 func (p *mplus) SetProfile(profile uint) {

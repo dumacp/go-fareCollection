@@ -11,11 +11,11 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
 	t2 := time.After(3 * time.Second)
-	tqr := time.NewTicker(30 * time.Second)
+	// tqr := time.NewTicker(30 * time.Second)
 	for {
 		select {
-		case <-tqr.C:
-			rootctx.Send(self, &MsgNewRand{Value: int(NewCode())})
+		// case <-tqr.C:
+		// 	rootctx.Send(self, &MsgNewRand{Value: int(NewCode())})
 		case <-t2:
 			rootctx.Send(self, &MsgTick{})
 		case <-t1.C:

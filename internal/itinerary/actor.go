@@ -101,133 +101,139 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Send(ctx.Self(), &MsgGetRoutes{})
 		ctx.Send(ctx.Self(), &MsgGetItinerary{})
 	case *MsgGetModes:
-		if err := func() error {
-			count := 30
-			numPages := 1000
-			for i := range make([]int, numPages) {
-				filter := fmt.Sprintf(filterHttpQuery, count, i)
-				url := fmt.Sprintf("%s%s", a.urlMode, filter)
-				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
-				if err != nil {
-					return err
-				}
-				logs.LogBuild.Printf("Get response: %s", resp)
-				var result []*Mode
-				if err := json.Unmarshal(resp, &result); err != nil {
-					return err
-				}
-				if a.modeMap == nil {
-					a.modeMap = make(map[int]*Mode)
-				}
-				for _, v := range result {
-					a.modeMap[v.PaymentMediumCode] = v
-				}
+		go func() {
+			if err := func() error {
+				count := 30
+				numPages := 1000
+				for i := range make([]int, numPages) {
+					filter := fmt.Sprintf(filterHttpQuery, count, i)
+					url := fmt.Sprintf("%s%s", a.urlMode, filter)
+					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+					if err != nil {
+						return err
+					}
+					logs.LogBuild.Printf("Get response: %s", resp)
+					var result []*Mode
+					if err := json.Unmarshal(resp, &result); err != nil {
+						return err
+					}
+					if a.modeMap == nil {
+						a.modeMap = make(map[int]*Mode)
+					}
+					for _, v := range result {
+						a.modeMap[v.PaymentMediumCode] = v
+					}
 
-				if len(result) < count {
-					break
+					if len(result) < count {
+						break
+					}
 				}
+				return nil
+			}(); err != nil {
+				logs.LogError.Println(err)
 			}
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
+		}()
 	case *MsgGetRoutes:
-		if err := func() error {
-			count := 30
-			numPages := 1000
-			for i := range make([]int, numPages) {
-				filter := fmt.Sprintf(filterHttpQuery, count, i)
-				url := fmt.Sprintf("%s%s", a.urlRoute, filter)
-				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
-				if err != nil {
-					return err
+		go func() {
+			if err := func() error {
+				count := 30
+				numPages := 1000
+				for i := range make([]int, numPages) {
+					filter := fmt.Sprintf(filterHttpQuery, count, i)
+					url := fmt.Sprintf("%s%s", a.urlRoute, filter)
+					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+					if err != nil {
+						return err
+					}
+					logs.LogBuild.Printf("Get response: %s", resp)
+					var result []*Route
+					if err := json.Unmarshal(resp, &result); err != nil {
+						return err
+					}
+					if a.routeMap == nil {
+						a.routeMap = make(map[int]*Route)
+					}
+					for _, v := range result {
+						a.routeMap[v.PaymentMediumCode] = v
+					}
+					if len(result) < count {
+						break
+					}
 				}
-				logs.LogBuild.Printf("Get response: %s", resp)
-				var result []*Route
-				if err := json.Unmarshal(resp, &result); err != nil {
-					return err
-				}
-				if a.routeMap == nil {
-					a.routeMap = make(map[int]*Route)
-				}
-				for _, v := range result {
-					a.routeMap[v.PaymentMediumCode] = v
-				}
-				if len(result) < count {
-					break
-				}
+				return nil
+			}(); err != nil {
+				logs.LogError.Println(err)
 			}
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
+		}()
 	case *MsgGetItinerary:
-		isUpdateMap := false
-		if err := func() error {
-			count := 30
-			numPages := 1000
-			actives := make(map[int]int)
-			for i := range make([]int, numPages) {
-				filter := fmt.Sprintf(filterHttpQuery, count, i)
-				url := fmt.Sprintf("%s%s", a.urlItinerary, filter)
-				resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
-				if err != nil {
-					return err
-				}
-				logs.LogBuild.Printf("Get response: %s", resp)
-				var result []*Itinerary
-				if err := json.Unmarshal(resp, &result); err != nil {
-					return err
-				}
-				if a.itineraryMap == nil {
-					a.itineraryMap = make(ItineraryMap)
-				}
-				for _, v := range result {
-					actives[v.PaymentMediumCode] = 0
-					if iti, ok := a.itineraryMap[v.PaymentMediumCode]; ok {
-						if iti.Metadata.UpdatedAt >= v.Metadata.UpdatedAt {
-							continue
+		go func(ctx actor.Context) {
+			isUpdateMap := false
+			if err := func() error {
+				count := 30
+				numPages := 1000
+				actives := make(map[int]int)
+				for i := range make([]int, numPages) {
+					filter := fmt.Sprintf(filterHttpQuery, count, i)
+					url := fmt.Sprintf("%s%s", a.urlItinerary, filter)
+					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+					if err != nil {
+						return err
+					}
+					logs.LogBuild.Printf("Get response: %s", resp)
+					var result []*Itinerary
+					if err := json.Unmarshal(resp, &result); err != nil {
+						return err
+					}
+					if a.itineraryMap == nil {
+						a.itineraryMap = make(ItineraryMap)
+					}
+					for _, v := range result {
+						actives[v.PaymentMediumCode] = 0
+						if iti, ok := a.itineraryMap[v.PaymentMediumCode]; ok {
+							if iti.Metadata.UpdatedAt >= v.Metadata.UpdatedAt {
+								continue
+							}
+						}
+						isUpdateMap = true
+						a.itineraryMap[v.PaymentMediumCode] = v
+						if a.db != nil {
+							data, err := json.Marshal(v)
+							if err != nil {
+								continue
+							}
+							ctx.Send(a.db, &database.MsgUpdateData{
+								Database:   databaseName,
+								Collection: collectionNameData,
+								ID:         v.ID,
+								Data:       data,
+							})
 						}
 					}
-					isUpdateMap = true
-					a.itineraryMap[v.PaymentMediumCode] = v
-					if a.db != nil {
-						data, err := json.Marshal(v)
-						if err != nil {
-							continue
+					if len(result) < count {
+						break
+					}
+				}
+
+				if a.db != nil {
+					for k, v := range a.itineraryMap {
+						if _, ok := actives[k]; !ok {
+							ctx.Send(a.db, &database.MsgDeleteData{
+								ID:         v.ID,
+								Database:   databaseName,
+								Collection: collectionNameData,
+							})
 						}
-						ctx.Send(a.db, &database.MsgUpdateData{
-							Database:   databaseName,
-							Collection: collectionNameData,
-							ID:         v.ID,
-							Data:       data,
-						})
 					}
 				}
-				if len(result) < count {
-					break
-				}
-			}
+				return nil
 
-			if a.db != nil {
-				for k, v := range a.itineraryMap {
-					if _, ok := actives[k]; !ok {
-						ctx.Send(a.db, &database.MsgDeleteData{
-							ID:         v.ID,
-							Database:   databaseName,
-							Collection: collectionNameData,
-						})
-					}
-				}
+			}(); err != nil {
+				logs.LogError.Println(err)
 			}
-			return nil
-
-		}(); err != nil {
-			logs.LogError.Println(err)
-		}
-		if isUpdateMap {
-			ctx.Send(ctx.Self(), &MsgPublish{})
-		}
+			if isUpdateMap {
+				ctx.Send(ctx.Self(), &MsgPublish{})
+			}
+		}(ctx)
 	case *MsgPublish:
 		if a.evs != nil {
 			if a.itineraryMap != nil {

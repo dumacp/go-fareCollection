@@ -16,7 +16,7 @@ func FormatSaldo(data int) string {
 	// 	v := data / 1000
 	// 	res = append(res, []byte(fmt.Sprintf("%d'", v))...)
 	// }
-	p := message.NewPrinter(language.English)
+	p := message.NewPrinter(language.LatinAmericanSpanish)
 	return p.Sprintf("%d", data)
 
 	// return fmt.Sprintf("%s", res)

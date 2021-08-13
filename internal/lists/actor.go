@@ -175,30 +175,32 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 		}()
 	case *MsgGetLists:
-		resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp, nil)
-		if err != nil {
-			logs.LogError.Println(err)
-			break
-		}
-		logs.LogBuild.Printf("Get response: %s", resp)
-		var result []*ListElement
-		if err := json.Unmarshal(resp, &result); err != nil {
-			logs.LogError.Println(err)
-			break
-		}
-
-		a.listInfo = make(map[string]*ListElement)
-		for _, v := range result {
-			a.listInfo[v.Code] = v
-		}
-		if len(a.watchLists) > 0 {
-			for _, listCode := range a.watchLists {
-				if _, ok := a.listInfo[listCode]; !ok {
-					continue
-				}
-				ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[listCode].ID, Code: listCode})
+		go func(ctx actor.Context) {
+			resp, err := utils.Get(a.httpClient, a.url, a.userHttp, a.passHttp, nil)
+			if err != nil {
+				logs.LogError.Println(err)
+				return
 			}
-		}
+			logs.LogBuild.Printf("Get response: %s", resp)
+			var result []*ListElement
+			if err := json.Unmarshal(resp, &result); err != nil {
+				logs.LogError.Println(err)
+				return
+			}
+
+			a.listInfo = make(map[string]*ListElement)
+			for _, v := range result {
+				a.listInfo[v.Code] = v
+			}
+			if len(a.watchLists) > 0 {
+				for _, listCode := range a.watchLists {
+					if _, ok := a.listInfo[listCode]; !ok {
+						continue
+					}
+					ctx.Send(ctx.Self(), &MsgGetListById{ID: a.listInfo[listCode].ID, Code: listCode})
+				}
+			}
+		}(ctx)
 	case *MsgGetListById:
 		//Verify UpdateAt
 		if a.listMap != nil {
@@ -219,37 +221,38 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 			}
 		}
-		url := fmt.Sprintf("%s/%s", a.url, msg.ID)
-		resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
-		if err != nil {
-			logs.LogError.Println(err)
-			break
-		}
-		logs.LogBuild.Printf("Get response: %s", resp)
-		list := new(List)
-		if err := json.Unmarshal(resp, list); err != nil {
-			logs.LogError.Println(err)
-			break
-		}
-		if a.listMap == nil {
-			a.listMap = make(map[string]*List)
-		}
-		if v, ok := a.listMap[list.Code]; ok {
-			if v.Metadata.UpdatedAt >= list.Metadata.UpdatedAt {
-				break
+		go func(ctx actor.Context) {
+			url := fmt.Sprintf("%s/%s", a.url, msg.ID)
+			resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
+			if err != nil {
+				logs.LogError.Println(err)
+				return
 			}
-		}
-		if a.db != nil {
-			ctx.Send(a.db, &database.MsgUpdateData{
-				Database:   databaseName,
-				Collection: collectionNameData,
-				ID:         list.ID,
-				Data:       resp,
-			})
-		}
-		Populate(list)
-		a.listMap[list.Code] = list
-
+			logs.LogBuild.Printf("Get response: %s", resp)
+			list := new(List)
+			if err := json.Unmarshal(resp, list); err != nil {
+				logs.LogError.Println(err)
+				return
+			}
+			if a.listMap == nil {
+				a.listMap = make(map[string]*List)
+			}
+			if v, ok := a.listMap[list.Code]; ok {
+				if v.Metadata.UpdatedAt >= list.Metadata.UpdatedAt {
+					return
+				}
+			}
+			if a.db != nil {
+				ctx.Send(a.db, &database.MsgUpdateData{
+					Database:   databaseName,
+					Collection: collectionNameData,
+					ID:         list.ID,
+					Data:       resp,
+				})
+			}
+			Populate(list)
+			a.listMap[list.Code] = list
+		}(ctx)
 	}
 }
 
