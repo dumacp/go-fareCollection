@@ -208,7 +208,7 @@ func (a *Actor) RunFSM() {
 					// 		return fmt.Errorf("QR error: %w", err)
 					// 	}
 					// }
-					a.ctx.Send(a.ctx.Parent(), &MsgNewCodeQR{Value: data})
+					a.ctx.Request(a.ctx.Parent(), &MsgNewCodeQR{Value: data})
 					return nil
 				}(); err != nil {
 					logs.LogError.Println(err)

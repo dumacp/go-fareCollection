@@ -60,5 +60,7 @@ type Payment interface {
 	SetRawDataBefore(interface{})
 	SetRawDataAfter(interface{})
 	// IncConsecutive()
+	SetError(err string)
+	Error() string
 	SetLock()
 }

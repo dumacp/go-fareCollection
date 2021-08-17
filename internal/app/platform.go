@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	urlQr = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
-	url   = "https://sibus.nebulae.com.co/api/external-system-gateway/rest/collected-fare"
+	// urlQr = `tinyurl.com/SIBUS-QR?r=16&d=OMV-Z7-1431&p=%d`
+	url = "https://sibus.nebulae.com.co/api/external-system-gateway/rest/collected-fare"
 )
 
 const (

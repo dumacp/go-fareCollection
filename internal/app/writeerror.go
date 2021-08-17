@@ -5,7 +5,7 @@ import (
 )
 
 func rewrite(new, last payment.Payment, lastWriteError uint64) bool {
-	if new.UID() != lastWriteError || new.UID() != last.UID() {
+	if last == nil || new.UID() != lastWriteError || new.UID() != last.UID() {
 		return false
 	}
 	// logs.LogInfo.Printf("new: %v, last: %v",

@@ -38,7 +38,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.chRand = make(chan int)
 		go tickQR(ctx, a.quit, a.chRand)
 	case *MsgNewCodeQR:
-		ctx.Send(ctx.Parent(), msg)
+		ctx.Request(ctx.Parent(), msg)
 	case *MsgNewRand:
 		// a.lastRand = a.actualRand
 		// a.actualRand = msg.Value
@@ -55,7 +55,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(ctx.Parent(), &messages.MsgWritePaymentResponse{
 				Uid:  msg.Uid,
 				Type: msg.Type,
-				Raw:  nil,
+				Raw:  make(map[string]string),
 			})
 		}
 	case *MsgResponseCodeQR:
@@ -85,27 +85,38 @@ func (a *Actor) Receive(ctx actor.Context) {
 				if err := json.Unmarshal(mess.Value, &mapp); err != nil {
 					return fmt.Errorf("QR error: %w", err)
 				}
+				raw := make(map[string]string)
 				data := make(map[string]*messages.Value)
 				for k, v := range mapp {
 					switch value := v.(type) {
+					case float64:
+						raw[k] = fmt.Sprintf("%d", int32(value))
+						data[k] = &messages.Value{Data: &messages.Value_IntValue{IntValue: int32(value)}}
 					case int:
+						raw[k] = fmt.Sprintf("%d", value)
 						data[k] = &messages.Value{Data: &messages.Value_IntValue{IntValue: int32(value)}}
 					case uint:
+						raw[k] = fmt.Sprintf("%d", value)
 						data[k] = &messages.Value{Data: &messages.Value_UintValue{UintValue: uint32(value)}}
 					case int64:
+						raw[k] = fmt.Sprintf("%d", value)
 						data[k] = &messages.Value{Data: &messages.Value_Int64Value{Int64Value: int64(value)}}
 					case uint64:
+						raw[k] = fmt.Sprintf("%d", value)
 						data[k] = &messages.Value{Data: &messages.Value_Uint64Value{Uint64Value: uint64(value)}}
 					case string:
+						raw[k] = value
 						data[k] = &messages.Value{Data: &messages.Value_StringValue{StringValue: value}}
 					case []byte:
+						raw[k] = fmt.Sprintf("%s", value)
 						data[k] = &messages.Value{Data: &messages.Value_BytesValue{BytesValue: value}}
 					}
 				}
 				if ctx.Parent() != nil {
-					ctx.Send(ctx.Parent(), &messages.MsgPayment{
+					ctx.Request(ctx.Parent(), &messages.MsgPayment{
 						Type: "ENDUSER_QR",
 						Data: data,
+						Raw:  raw,
 					})
 				}
 

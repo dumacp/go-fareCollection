@@ -15,3 +15,12 @@ func (t *token) ApplyFare(data interface{}) (interface{}, error) {
 	}
 	return 0, errors.New("pin parse is invalid")
 }
+
+func (t *token) Balance() int {
+	return int(t.id)
+}
+
+func (t *token) FareID() uint {
+
+	return 0
+}

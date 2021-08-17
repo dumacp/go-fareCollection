@@ -23,6 +23,7 @@ import (
 	"github.com/dumacp/go-fareCollection/pkg/payment/mplus"
 	"github.com/dumacp/go-fareCollection/pkg/payment/token"
 	"github.com/dumacp/go-logs/pkg/logs"
+	semessages "github.com/dumacp/go-sesam/pkg/messages"
 	"github.com/looplab/fsm"
 )
 
@@ -120,25 +121,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
 		a.quit = make(chan int)
 		go tick(ctx, 60*time.Minute, a.quit)
-		// case *MsgTagDetected:
-		// 	if err := func() error {
-		// 		if a.actualTag == a.lastTag {
-		// 			if a.lastTimeDetect.Before(time.Now().Add(-5 * time.Second)) {
-		// 				return nil
-		// 			}
-		// 		}
-		// 		//read card
-		// 		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-		// 		a.lastTag = msg.UID
-		// 		return nil
-		// 	}(); err != nil {
-		// 		logs.LogError.Println(err)
-		// 	}
-	// case *itinerary.MsgMap:
-	// 	// a.itineraryMap = msg.Data
-	// 	if a.pidParams != nil {
-	// 		ctx.Send(a.pidParams, msg)
-	// 	}
 	case *parameters.ConfigParameters:
 		if a.pidParams != nil {
 			ctx.Send(a.pidParams, msg)
@@ -169,6 +151,50 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.pidUso = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.RegisterSAMActor:
 		a.pidSam = actor.NewPID(msg.Addr, msg.Id)
+	case *MsgWriteErrorVerify:
+		if a.lastWriteError > 0 && a.mcard != nil {
+			logs.LogBuild.Printf("nodeID: [% X]", uuid.NodeID())
+			id, err := uuid.NewUUID()
+			if err != nil {
+				logs.LogError.Printf("uuid err: %s", err)
+				break
+			}
+			coord := ""
+			if a.pidGps != nil {
+				res, err := ctx.RequestFuture(a.pidGps, &gps.MsgGetGps{}, 10*time.Millisecond).Result()
+				if err != nil {
+					logs.LogWarn.Println("get fare err: %w", err)
+				} else {
+					switch v := res.(type) {
+					case *gps.MsgGPS:
+						if v.Data != nil {
+							coord = string(v.Data)
+							logs.LogBuild.Printf("coord: %s", coord)
+						}
+					}
+				}
+			}
+			uso := &usostransporte.UsoTransporte{
+				ID:                    id.String(),
+				DeviceID:              a.deviceID,
+				PaymentMediumTypeCode: a.mcard.Type(),
+				PaymentMediumId:       fmt.Sprintf("%d", a.mcard.ID()),
+				MediumID:              fmt.Sprintf("%d", a.mcard.UID()),
+				FareCode:              int(a.mcard.FareID()),
+				RawDataPrev:           a.mcard.RawDataBefore(),
+				RawDataAfter:          a.mcard.RawDataAfter(),
+				TransactionType:       "TRANSPORT_FARE_COLLECTION",
+				Error: &usostransporte.Error{
+					Name: "write error",
+					Desc: a.mcard.Error(),
+					Code: 1,
+				},
+				Coord: coord,
+			}
+			ctx.Send(a.pidUso, &usostransporte.MsgUso{
+				Data: uso,
+			})
+		}
 	case *messages.MsgPayment:
 		/**/
 		jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
@@ -179,7 +205,21 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 		/**/
 		var paym payment.Payment
-		update, err := func() (map[string]interface{}, error) {
+		update, err := func() (mappp map[string]interface{}, err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					logs.LogError.Println("Recovered in *messages.MsgPayment app\", ", r)
+					switch x := r.(type) {
+					case string:
+						err = errors.New(x)
+					case error:
+						err = x
+					default:
+						err = errors.New("unknown panic")
+					}
+					time.Sleep(3 * time.Second)
+				}
+			}()
 			// if a.actualTag == a.errorWriteTag {
 			// 	//Commit Tag
 			// 	return nil
@@ -215,14 +255,60 @@ func (a *Actor) Receive(ctx actor.Context) {
 					logs.LogInfo.Printf("rewrite try, uid: %d", msg.Uid)
 					return a.mcard.Updates(), nil
 				}
+				if a.mcard != nil && paym.UID() != a.mcard.UID() {
+					logs.LogBuild.Printf("nodeID: [% X]", uuid.NodeID())
+					id, err := uuid.NewUUID()
+					if err != nil {
+						logs.LogError.Printf("uuid err: %s", err)
+						break
+					}
+					coord := ""
+					if a.pidGps != nil {
+						res, err := ctx.RequestFuture(a.pidGps, &gps.MsgGetGps{}, 10*time.Millisecond).Result()
+						if err != nil {
+							logs.LogWarn.Println("get fare err: %w", err)
+						} else {
+							switch v := res.(type) {
+							case *gps.MsgGPS:
+								if v.Data != nil {
+									coord = string(v.Data)
+									logs.LogBuild.Printf("coord: %s", coord)
+								}
+							}
+						}
+					}
+					uso := &usostransporte.UsoTransporte{
+						ID:                    id.String(),
+						DeviceID:              a.deviceID,
+						PaymentMediumTypeCode: msg.Type,
+						PaymentMediumId:       fmt.Sprintf("%d", a.mcard.ID()),
+						MediumID:              fmt.Sprintf("%d", a.mcard.UID()),
+						FareCode:              int(a.mcard.FareID()),
+						RawDataPrev:           a.mcard.RawDataBefore(),
+						RawDataAfter:          a.mcard.RawDataAfter(),
+						TransactionType:       "TRANSPORT_FARE_COLLECTION",
+						Error: &usostransporte.Error{
+							Name: "write error",
+							Desc: a.mcard.Error(),
+							Code: 1,
+						},
+						Coord: coord,
+					}
+					ctx.Send(a.pidUso, &usostransporte.MsgUso{
+						Data: uso,
+					})
+				}
+
 			case "ENDUSER_QR":
 				paym = token.ParseToPayment(msg.Uid, mcard)
 			}
 
-			paym.SetRawDataBefore(msg.GetRaw())
+			raw := msg.GetRaw()
+			raw["mv"] = fmt.Sprintf("%d", paym.VersionLayout())
+			paym.SetRawDataBefore(raw)
 			a.mcard = paym
 			a.rawcard = msg.Raw
-			logs.LogBuild.Printf("tag map parse: %+v", paym)
+			logs.LogBuild.Printf("tag map parse: %+v", paym.Data())
 			//TODO: List
 			if a.params != nil {
 				for list, code := range a.listRestrictive {
@@ -374,30 +460,29 @@ func (a *Actor) Receive(ctx actor.Context) {
 		})
 	case *messages.MsgWritePaymentError:
 		a.lastWriteError = msg.Uid
-		a.mcard.SetRawDataAfter(msg.GetRaw())
+		raw := msg.GetRaw()
+		raw["mv"] = fmt.Sprintf("%d", a.mcard.VersionLayout())
+		a.mcard.SetRawDataAfter(raw)
+		a.mcard.SetError(msg.Error)
 		a.fmachine.Event(eError, NewErrorScreen("error de escritura", "vuelva a ubicar la tarjeta"))
 		logs.LogError.Printf("error de escritura, uid: %d, err: %s", msg.Uid, msg.Error)
 
 	case *messages.MsgWritePaymentResponse:
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, a.mcard.Balance())
-		a.mcard.SetRawDataAfter(msg.GetRaw())
+
+		raw := msg.GetRaw()
+		if raw != nil {
+			raw["mv"] = fmt.Sprintf("%d", a.mcard.VersionLayout())
+		}
+
+		a.mcard.SetRawDataAfter(raw)
 
 		// if !ok {
 		// 	logs.LogError.Println("seq is not INT")
 		// }
 		cardid := a.mcard.ID()
 		uid := msg.Uid
-		// if !ok {
-		// 	logs.LogError.Println("\"name\" is not STRING")
-		// }
-		// card := make(map[string]interface{})
-		// for k, v := range a.mcard.Data() {
-		// 	card[k] = v
-		// }
-		// for k, v := range a.mcard.Updates() {
-		// 	card[k] = v
-		// }
 		coord := ""
 		if a.pidGps != nil {
 			res, err := ctx.RequestFuture(a.pidGps, &gps.MsgGetGps{}, 10*time.Millisecond).Result()
@@ -439,23 +524,28 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Send(a.pidUso, &usostransporte.MsgUso{
 			Data: uso,
 		})
-		// hex.EncodeToString()
-		// go func() {
-		// SendUsoTAG(fmt.Sprintf("%d", id), int(tID+1), card, a.mcard.Data(), []float64{0, 0}, time.Now())
-		// if err != nil {
-		// 	logs.LogError.Printf("POST error: %s", err)
-		// 	return
-		// }
-		// logs.LogInfo.Printf("response platform: %s", response)
-		// }()
+		a.mcard = nil
 	case *qr.MsgNewCodeQR:
 		if err := func() error {
-			mdec := &messages.Decrypt{
+			divInput := msg.Value[0:4]
+			revDiv := make([]byte, 0)
+			for i := range divInput {
+				revDiv = append(revDiv, divInput[len(divInput)-1-i])
+			}
+			iv := make([]byte, 0)
+			iv = append(iv, divInput...)
+			iv = append(iv, revDiv...)
+			iv = append(iv, divInput...)
+			iv = append(iv, revDiv...)
+			mdec := &semessages.MsgDecryptRequest{
 				Data:     msg.Value[4:],
-				DivInput: msg.Value[0:4],
+				DevInput: divInput[0:4],
+				IV:       iv,
+				//TODO: How to get ?
+				KeySlot: 0x33,
 			}
 			logs.LogBuild.Printf("QR crypt: [% X], len: %d; [% X], len: %d",
-				mdec.Data, len(mdec.Data), mdec.DivInput, len(mdec.DivInput))
+				mdec.Data, len(mdec.Data), mdec.DevInput, len(mdec.DevInput))
 
 			var data []byte
 
@@ -464,11 +554,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return fmt.Errorf("get decrypt sam err: %w", err)
 			}
 			switch v := res.(type) {
-			case *messages.DecryptResponse:
-				if v.Data == nil {
+			case *semessages.MsgDecryptResponse:
+				if v.Plain == nil {
 					return errors.New("QR decrypt data is empty")
 				}
-				data = v.Data
+				data = v.Plain
 				logs.LogBuild.Printf("QR decrypt: %s, [%X]", data, data)
 			}
 
@@ -477,135 +567,15 @@ func (a *Actor) Receive(ctx actor.Context) {
 					Value: data,
 				})
 			}
-
-			// mess := struct {
-			// 	Type  string          `json:"t"`
-			// 	Value json.RawMessage `json:"v"`
-			// }{}
-			// data = bytes.TrimRight(data, "\x00")
-			// if err := json.Unmarshal(data, &mess); err != nil {
-			// 	return fmt.Errorf("QR error: %w", err)
-			// }
-			// var sendMsg interface{}
-			// switch strings.ToUpper(mess.Type) {
-			// case "DCIT":
-			// 	sendMsg = new(parameters.ConfigParameters)
-			// 	if err := json.Unmarshal(mess.Value, sendMsg); err != nil {
-			// 		return fmt.Errorf("QR error: %w", err)
-			// 	}
-			// 	ctx.Send(a.pidParams, sendMsg)
-			// case "USET":
-			// 	sendMsg = new(parameters.ConfigParameters)
-			// 	if err := json.Unmarshal(mess.Value, sendMsg); err != nil {
-			// 		return fmt.Errorf("QR error: %w", err)
-			// 	}
-			// 	logs.LogBuild.Printf("NewQR: %s", msg.Value)
-			// 	if err != nil {
-			// 		return fmt.Errorf("QR error: %w", err)
-			// 	}
-
-			// 	res := new(QrCode)
-			// 	if err := json.Unmarshal(newv, res); err != nil {
-			// 		logs.LogError.Printf("QR error: %s", err)
-			// 		break
-			// 	}
-			// 	pin, err := strconv.Atoi(res.Pin)
-			// 	if err != nil {
-			// 		logs.LogError.Printf("QR error: %s", err)
-			// 		break
-			// 	}
-			// 	if pin != a.lastRand && pin != a.actualRand {
-			// 		a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
-			// 		a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
-			// 		//TODO: cahngeeee!!!
-			// 		go func() {
-			// 			time.Sleep(2 * time.Second)
-			// 			a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
-			// 		}()
-			// 		logs.LogError.Printf("QR error: PIN is invalid")
-			// 		break
-			// 	}
-			// 	a.fmachine.Event(eQRValidated, fmt.Sprintf("%d", res.TransactionID))
-			// 	// ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: fmt.Sprintf("%d", res.TransactionID)})
-
-			// 	select {
-			// 	case a.chNewRand <- 1:
-			// 	case <-time.After(100 * time.Millisecond):
-			// 	}
-			// 	a.lastRand = a.actualRand
-			// 	a.actualRand = -1
-
-			// 	// go func() {
-			// 	SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
-			// 	if err != nil {
-			// 		logs.LogError.Printf("POST error: %s", err)
-			// 		return
-			// 	}
-			// 	logs.LogInfo.Printf("response platform: %s", response)
-			// }
 			return nil
 		}(); err != nil {
 			logs.LogError.Printf("QR error: %s", err)
 		}
-		// logs.LogBuild.Printf("NewQR: %s", msg.Value)
-		// v, err := DecodeQR(msg.Value)
-		// if err != nil {
-		// 	logs.LogError.Println(err)
-		// }
-		// logs.LogBuild.Printf("NewQR: %s, [% X]", v, v)
-
-		// //TODO: fix this bug
-		// newv := make([]byte, 0)
-		// for i := range v {
-		// 	if v[i] > 0x20 {
-		// 		newv = append(newv, v[i])
-		// 	}
-		// }
-
-		// res := new(QrCode)
-		// if err := json.Unmarshal(newv, res); err != nil {
-		// 	logs.LogError.Printf("QR error: %s", err)
-		// 	break
-		// }
-		// pin, err := strconv.Atoi(res.Pin)
-		// if err != nil {
-		// 	logs.LogError.Printf("QR error: %s", err)
-		// 	break
-		// }
-		// if pin != a.lastRand && pin != a.actualRand {
-		// 	a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
-		// 	a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
-		// 	//TODO: cahngeeee!!!
-		// 	go func() {
-		// 		time.Sleep(2 * time.Second)
-		// 		a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
-		// 	}()
-		// 	logs.LogError.Printf("QR error: PIN is invalid")
-		// 	break
-		// }
-		// a.fmachine.Event(eQRValidated, fmt.Sprintf("%d", res.TransactionID))
-		// // ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: fmt.Sprintf("%d", res.TransactionID)})
-
-		// select {
-		// case a.chNewRand <- 1:
-		// case <-time.After(100 * time.Millisecond):
-		// }
-		// a.lastRand = a.actualRand
-		// a.actualRand = -1
-
-		// // go func() {
-		// SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
-		// 	if err != nil {
-		// 		logs.LogError.Printf("POST error: %s", err)
-		// 		return
-		// 	}
-		// 	logs.LogInfo.Printf("response platform: %s", response)
-		// }()
 
 	case *qr.MsgNewRand:
 		a.lastRand = a.actualRand
 		a.actualRand = msg.Value
-		v := fmt.Sprintf(urlQr, msg.Value)
+		v := fmt.Sprintf(urlQr, a.params.PaymentItinerary, a.deviceID, msg.Value)
 		ctx.Send(a.pidGraph, &graph.MsgQrValue{Value: v})
 	}
 }

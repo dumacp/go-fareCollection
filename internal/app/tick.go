@@ -10,7 +10,10 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
+	defer t1.Stop()
 	t2 := time.After(3 * time.Second)
+	tWrite := time.NewTicker(30 * time.Second)
+	defer tWrite.Stop()
 	// tqr := time.NewTicker(30 * time.Second)
 	for {
 		select {
@@ -20,6 +23,8 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 			rootctx.Send(self, &MsgTick{})
 		case <-t1.C:
 			rootctx.Send(self, &MsgTick{})
+		case <-tWrite.C:
+			rootctx.Send(self, &MsgWriteErrorVerify{})
 		case <-quit:
 			return
 		}

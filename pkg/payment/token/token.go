@@ -5,6 +5,8 @@ import "github.com/dumacp/go-fareCollection/pkg/payment"
 type token struct {
 	ttype         string
 	pin           int
+	id            uint
+	data          map[string]interface{}
 	rawDataBefore interface{}
 	rawDataAfter  interface{}
 }
@@ -14,18 +16,14 @@ func (t *token) Type() string {
 }
 
 func (t *token) UID() uint64 {
-	panic("not implemented") // TODO: Implement
+	return uint64(t.id)
 }
 
 func (t *token) ID() uint {
-	panic("not implemented") // TODO: Implement
+	return t.id
 }
 
 func (t *token) Historical() []payment.Historical {
-	panic("not implemented") // TODO: Implement
-}
-
-func (t *token) Balance() int {
 	panic("not implemented") // TODO: Implement
 }
 
@@ -50,7 +48,8 @@ func (t *token) Consecutive() uint {
 }
 
 func (t *token) VersionLayout() uint {
-	panic("not implemented") // TODO: Implement
+	// panic("not implemented") // TODO: Implement
+	return 0
 }
 
 func (t *token) Lock() bool {
@@ -58,14 +57,10 @@ func (t *token) Lock() bool {
 }
 
 func (t *token) Data() map[string]interface{} {
-	panic("not implemented") // TODO: Implement
+	return t.data
 }
 
 func (t *token) Updates() map[string]interface{} {
-	panic("not implemented") // TODO: Implement
-}
-
-func (t *token) FareID() uint {
 	panic("not implemented") // TODO: Implement
 }
 
@@ -82,5 +77,13 @@ func (t *token) SetProfile(_ uint) {
 }
 
 func (t *token) SetLock() {
+	panic("not implemented") // TODO: Implement
+}
+
+func (t *token) SetError(err string) {
+	panic("not implemented") // TODO: Implement
+}
+
+func (t *token) Error() string {
 	panic("not implemented") // TODO: Implement
 }

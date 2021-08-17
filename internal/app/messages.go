@@ -15,3 +15,4 @@ package app
 // }
 
 type MsgTick struct{}
+type MsgWriteErrorVerify struct{}
