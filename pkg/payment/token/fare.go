@@ -21,6 +21,5 @@ func (t *token) Balance() int {
 }
 
 func (t *token) FareID() uint {
-
 	return 0
 }

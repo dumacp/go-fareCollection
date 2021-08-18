@@ -17,16 +17,14 @@ import (
 type Actor struct {
 	fmachine *fsm.FSM
 	ctx      actor.Context
-	// actualRand int
-	// lastRand   int
-	quit   chan int
-	chRand chan int
+	chRand   chan int
+	quit     chan int
 }
 
 func NewActor() actor.Actor {
 	a := &Actor{}
 	a.fmachine = NewFSM(nil)
-	go a.RunFSM()
+
 	return a
 }
 
@@ -35,14 +33,16 @@ func (a *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 		a.fmachine.Event(eOpened)
+		a.quit = make(chan int)
+		go a.RunFSM(a.quit)
 		a.chRand = make(chan int)
-		go tickQR(ctx, a.quit, a.chRand)
+		go tickQR(ctx, a.chRand)
+	case *actor.Stopping:
+		close(a.chRand)
+		close(a.quit)
 	case *MsgNewCodeQR:
 		ctx.Request(ctx.Parent(), msg)
 	case *MsgNewRand:
-		// a.lastRand = a.actualRand
-		// a.actualRand = msg.Value
-
 		if ctx.Parent() != nil {
 			ctx.Send(ctx.Parent(), msg)
 		}
@@ -120,43 +120,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 					})
 				}
 
-				// res := new(QrCode)
-				// if err := json.Unmarshal(newv, res); err != nil {
-				// 	logs.LogError.Printf("QR error: %s", err)
-				// 	break
-				// }
-				// pin, err := strconv.Atoi(res.Pin)
-				// if err != nil {
-				// 	logs.LogError.Printf("QR error: %s", err)
-				// 	break
-				// }
-				// if pin != a.lastRand && pin != a.actualRand {
-				// 	a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
-				// 	a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
-				// 	//TODO: cahngeeee!!!
-				// 	go func() {
-				// 		time.Sleep(2 * time.Second)
-				// 		a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
-				// 	}()
-				// 	logs.LogError.Printf("QR error: PIN is invalid")
-				// 	break
-				// }
-				// a.fmachine.Event(eQRValidated, fmt.Sprintf("%d", res.TransactionID))
-				// // ctx.Send(a.pidGraph, &graph.MsgValidationQR{Value: fmt.Sprintf("%d", res.TransactionID)})
-
-				// select {
-				// case a.chNewRand <- 1:
-				// case <-time.After(100 * time.Millisecond):
-				// }
-				// a.lastRand = a.actualRand
-				// a.actualRand = -1
-
-				// // go func() {
-				// SendUsoQR(int(res.TransactionID), []float64{0, 0}, time.Now())
-				// if err != nil {
-				// 	return fmt.Printf("POST error: %s", err)
-				// }
-				// logs.LogInfo.Printf("response platform: %s", response)
 			}
 			return nil
 		}(); err != nil {

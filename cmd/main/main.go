@@ -137,6 +137,7 @@ func main() {
 	ctx.Send(pidApp, &messages.RegisterSAMActor{Addr: readerActor.PID().Address, Id: readerActor.PID().Id})
 	//TODO: first param
 	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidParam)
+	ctx.RequestWithCustomSender(pidIti, &itinerary.MsgSubscribe{}, pidFare)
 	time.Sleep(1 * time.Second)
 	ctx.RequestWithCustomSender(pidParam, &parameters.MsgSubscribe{}, pidApp)
 

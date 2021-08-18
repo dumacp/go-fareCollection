@@ -1,6 +1,7 @@
 package qr
 
 import (
+	"encoding/binary"
 	"errors"
 	"math/rand"
 	"time"
@@ -22,7 +23,7 @@ type QrCode struct {
 	TransactionID int32  `json:"t"`
 }
 
-func tickQR(ctx actor.Context, quit, ch <-chan int) {
+func tickQR(ctx actor.Context, ch <-chan int) {
 
 	timeout := 30 * time.Second
 	rootctx := ctx.ActorSystem().Root
@@ -32,7 +33,10 @@ func tickQR(ctx actor.Context, quit, ch <-chan int) {
 
 	for {
 		select {
-		case <-ch:
+		case _, ok := <-ch:
+			if !ok {
+				return
+			}
 			rootctx.Send(self, &MsgNewRand{Value: int(NewCode())})
 			if !t1.Stop() {
 				select {
@@ -57,11 +61,12 @@ func tickQR(ctx actor.Context, quit, ch <-chan int) {
 func NewCode() int32 {
 
 	rand.Seed(time.Now().UnixNano())
-	v1 := 12000 + rand.Int31n(10000)
-	rand.Seed(time.Now().UnixNano())
-	v2 := rand.Int31n(10000)
+	buff1 := make([]byte, 4)
+	rand.Read(buff1)
 
-	return v1 + v2
+	v1 := binary.LittleEndian.Uint32(buff1) & 0x7FFFFFFF
+
+	return int32(v1)
 }
 
 // func DecodeQR(data []byte) ([]byte, error) {

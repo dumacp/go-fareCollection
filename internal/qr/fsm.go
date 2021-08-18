@@ -90,7 +90,7 @@ func NewFSM(callbacks fsm.Callbacks) *fsm.FSM {
 	return rfsm
 }
 
-func (a *Actor) RunFSM() {
+func (a *Actor) RunFSM(quit <-chan int) {
 
 	if err := func() (errr error) {
 		defer func() {
@@ -114,6 +114,11 @@ func (a *Actor) RunFSM() {
 		lastTime := time.Now().Add(300 * time.Second)
 
 		for {
+			select {
+			case <-quit:
+				return nil
+			default:
+			}
 			if lastState != a.fmachine.Current() {
 				lastState = a.fmachine.Current()
 				logs.LogBuild.Printf("current state QR reader: %s", a.fmachine.Current())
@@ -183,31 +188,6 @@ func (a *Actor) RunFSM() {
 						return fmt.Errorf("QR error: %w", err)
 					}
 
-					// block, err := aes.NewCipher(keyQR)
-					// if err != nil {
-					// 	return fmt.Errorf("QR error: %w", err)
-					// }
-					// modeD := cipher.NewCBCDecrypter(block)
-					// mess := struct {
-					// 	Type  string          `json:"t"`
-					// 	Value json.RawMessage `json:"v"`
-					// }{}
-					// if err := json.Unmarshal(data, &mess); err != nil {
-					// 	return fmt.Errorf("QR error: %w", err)
-					// }
-					// var sendMsg interface{}
-					// switch strings.ToUpper(mess.Type) {
-					// case "CONF":
-					// 	sendMsg = new(parameters.ConfigParameters)
-					// 	if err := json.Unmarshal(data, sendMsg); err != nil {
-					// 		return fmt.Errorf("QR error: %w", err)
-					// 	}
-					// case "USET":
-					// 	sendMsg = new(parameters.ConfigParameters)
-					// 	if err := json.Unmarshal(data, sendMsg); err != nil {
-					// 		return fmt.Errorf("QR error: %w", err)
-					// 	}
-					// }
 					a.ctx.Request(a.ctx.Parent(), &MsgNewCodeQR{Value: data})
 					return nil
 				}(); err != nil {

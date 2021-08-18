@@ -19,6 +19,7 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 	histr := make(map[string]payment.HistoricalRecharge)
 
 	m := &mplus{}
+	m.balance = 0x7FFFFf
 	m.uid = uid
 	m.ttype = ttype
 	m.actualMap = mapa
@@ -27,12 +28,12 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 		switch {
 		case k == SaldoTarjeta:
 			v, _ := value.(int)
-			if v > m.balance {
+			if v < m.balance {
 				m.balance = v
 			}
 		case k == SaldoTarjetaBackup:
 			v, _ := value.(int)
-			if v > m.balance {
+			if v < m.balance {
 				m.balance = v
 			}
 		case k == PERFIL:

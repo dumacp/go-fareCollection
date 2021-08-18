@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
@@ -28,7 +30,8 @@ import (
 )
 
 type Actor struct {
-	deviceID string
+	deviceID    string
+	deviceIDnum int
 	// lastTag        uint64
 	// lastTimeDetect time.Time
 	// errorWriteTag  uint64
@@ -52,8 +55,8 @@ type Actor struct {
 	rawcard   map[string]string
 	// updates        map[string]interface{}
 	// chNewRand  chan int
-	lastRand   int
-	actualRand int
+	oldRand int
+	newRand int
 	// itineraryMap   itinerary.ItineraryMap
 	params          *parameters.Parameters
 	listRestrictive map[string]string
@@ -65,10 +68,12 @@ type Actor struct {
 func NewActor(id string) actor.Actor {
 	a := &Actor{}
 	a.deviceID = id
+	varSplit := strings.Split(id, "-")
+	if len(varSplit) > 0 {
+		a.deviceIDnum, _ = strconv.Atoi(varSplit[len(varSplit)-1])
+	}
 	a.newFSM(nil)
 	go a.RunFSM()
-	// a.chNewRand = make(chan int)
-	// go a.TickQR(a.chNewRand)
 	return a
 }
 
@@ -103,8 +108,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return err
 			}
 			a.pidPicto = pidPicto
-			qrActor := qr.NewActor()
-			propsQR := actor.PropsFromFunc(qrActor.Receive)
+			propsQR := actor.PropsFromProducer(qr.NewActor)
 			pidQR, err := ctx.SpawnNamed(propsQR, "qr-actor")
 			if err != nil {
 				time.Sleep(3 * time.Second)
@@ -308,7 +312,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			paym.SetRawDataBefore(raw)
 			a.mcard = paym
 			a.rawcard = msg.Raw
-			logs.LogBuild.Printf("tag map parse: %+v", paym.Data())
+			logs.LogBuild.Printf("tag map parse: %+v", a.mcard.Data())
 			//TODO: List
 			if a.params != nil {
 				for list, code := range a.listRestrictive {
@@ -317,7 +321,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 					}
 					resList, err := ctx.RequestFuture(a.pidList, &lists.MsgVerifyInList{
 						ListID: list,
-						ID:     []int64{int64(paym.ID())},
+						ID:     []int64{int64(a.mcard.ID())},
 					}, 60*time.Millisecond).Result()
 					if err != nil {
 						logs.LogWarn.Printf("get restrictive list err: %s", err)
@@ -334,10 +338,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 			}
 
-			switch paym.Type() {
+			switch a.mcard.Type() {
 			case "MIFARE_PLUS_EV2_4K":
 				lastFares := make(map[int64]int)
-				hs := paym.Historical()
+				hs := a.mcard.Historical()
 				for _, v := range hs {
 					timestamp := v.TimeTransaction().Unix()
 					fareid := v.FareID()
@@ -345,18 +349,20 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 				getFare := &fare.MsgGetFare{
 					LastFarePolicies: lastFares,
-					ProfileID:        int(paym.ProfileID()),
-					ItineraryID:      157,
+					ProfileID:        int(a.mcard.ProfileID()),
+					// ItineraryID:      157,
 					// ModeID:           1,
-					RouteID:         77,
+					// RouteID:         77,
 					FromItineraryID: int(hs[len(hs)-1].ItineraryID()),
 				}
-				if a.params != nil {
-					getFare.ModeID = int(a.params.PaymentMode)
-					//TODO: get ids by QR
-					// getFare.RouteID = int(a.params.PaymentRoute)
-					// getFare.ItineraryID = int(a.params.PaymentItinerary)
+				if a.params == nil {
+					return nil, errors.New("params is nil")
 				}
+
+				getFare.ModeID = int(a.params.PaymentMode)
+				//TODO: get ids by QR
+				getFare.RouteID = int(a.params.PaymentRoute)
+				getFare.ItineraryID = int(a.params.PaymentItinerary)
 
 				//TODO: farePID?
 				if a.pidFare == nil {
@@ -376,8 +382,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 					// fareID = res.FarePolicyID
 					fareData = res
 					//TODO: how get deviceID?
-					fareData.DeviceID = 3033
-					fareData.ItineraryID = 157
+					fareData.DeviceID = a.deviceIDnum
+					fareData.ItineraryID = a.params.PaymentItinerary
 				case *fare.MsgError:
 					return nil, errors.New(res.Err)
 				default:
@@ -386,7 +392,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 				logs.LogBuild.Printf("fare calc: %+v", fareData)
 
-				if _, err := paym.ApplyFare(fareData); err != nil {
+				if _, err := a.mcard.ApplyFare(fareData); err != nil {
 					logs.LogBuild.Println(err)
 					if errors.Is(err, payment.ErrorBalance) {
 						//Send Msg Error Balance
@@ -403,12 +409,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 					return nil, err
 				}
 				// a.updates = paym.Updates()
-				logs.LogBuild.Printf("tag updates: %+v", paym.Updates())
+				logs.LogBuild.Printf("tag updates: %+v", a.mcard.Updates())
 
-				return paym.Updates(), nil
+				return a.mcard.Updates(), nil
 
 			case "ENDUSER_QR":
-				if pin, err := paym.ApplyFare([]int{a.actualRand, a.lastRand}); err != nil {
+				if pin, err := a.mcard.ApplyFare([]int{a.newRand, a.oldRand}); err != nil {
 					a.ctx.Send(a.pidPicto, &picto.MsgPictoNotOK{})
 					a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerBad{})
 					go func() {
@@ -417,10 +423,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 					}()
 					return nil, err
 				} else {
-					for _, v := range []int{a.actualRand, a.lastRand} {
-						if v == pin {
-							a.actualRand = v
-							a.lastRand = -1
+					for _, v := range []*int{&a.newRand, &a.oldRand} {
+						if *v == pin {
+							*v = -1
 						}
 					}
 				}
@@ -428,7 +433,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return nil, nil
 
 			}
-			return nil, fmt.Errorf("payment type not found: %s, %s", msg.Type, paym.Type())
+			return nil, fmt.Errorf("payment type not found: %s, %s", msg.Type, a.mcard.Type())
 		}()
 		if err != nil {
 			a.fmachine.Event(eError, err)
@@ -573,8 +578,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 	case *qr.MsgNewRand:
-		a.lastRand = a.actualRand
-		a.actualRand = msg.Value
+		a.oldRand = a.newRand
+		a.newRand = msg.Value
 		v := fmt.Sprintf(urlQr, a.params.PaymentItinerary, a.deviceID, msg.Value)
 		ctx.Send(a.pidGraph, &graph.MsgQrValue{Value: v})
 	}

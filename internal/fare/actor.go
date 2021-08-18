@@ -167,7 +167,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 					q.FromModeID = a.itineraryMap[msg.ItineraryID].ModePaymentMediumCode
 					q.FromRouteID = a.itineraryMap[msg.ItineraryID].RoutePaymentMediumCode
 				} else {
-					logs.LogError.Println("itinerary not found")
+					logs.LogError.Printf("itinerary not found: %d", msg.FromItineraryID)
 					//TODO: ?
 					// if a.pidItinerary != nil {
 					// 	ctx.Request(a.pidItinerary, &itinerary.MsgGetMap{})
