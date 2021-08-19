@@ -27,14 +27,14 @@ import (
 	"github.com/google/uuid"
 )
 
-var debug bool
+var verbose int
 var logstd bool
 var id string
 var serial string
 var baud int
 
 func init() {
-	flag.BoolVar(&debug, "debug", false, "debug?")
+	flag.IntVar(&verbose, "verbose", 0, "level log\n\t0: Error\n\t1: Warning\n\t2: Info\n\t3: Debug")
 	flag.BoolVar(&logstd, "logStd", false, "logs in stderr?")
 	flag.StringVar(&id, "id", "OMZV7-0001", "device ID")
 	flag.StringVar(&serial, "serial", "/dev/ttymxc4", "device path")
@@ -43,7 +43,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-	initLogs(debug, logstd)
+	initLogs(verbose, logstd)
 
 	logs.LogBuild.Println("debug log")
 
@@ -148,6 +148,8 @@ func main() {
 	signal.Notify(finish, syscall.SIGTERM)
 
 	for range finish {
+		ctx.Poison(pidApp)
+		time.Sleep(1 * time.Second)
 		log.Print("Finish")
 		return
 	}

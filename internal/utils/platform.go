@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -32,8 +33,8 @@ func Post(client *http.Client,
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(username, password)
 
-	tr := LoadLocalCert()
 	if client == nil {
+		tr := LoadLocalCert()
 		client = &http.Client{Transport: tr}
 		client.Timeout = 30 * time.Second
 	}
@@ -52,6 +53,13 @@ func Post(client *http.Client,
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("StatusCode: %d, response: %s", resp.StatusCode, body)
+	}
 	return ioutil.ReadAll(resp.Body)
 }
 
@@ -64,8 +72,8 @@ func Get(client *http.Client,
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(username, password)
 
-	tr := LoadLocalCert()
 	if client == nil {
+		tr := LoadLocalCert()
 		client = &http.Client{Transport: tr}
 		client.Timeout = 30 * time.Second
 	}

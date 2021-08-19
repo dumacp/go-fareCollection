@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-var ErrorBalance = errors.New("Balance error")
+var ErrorBalance = errors.New("balance error")
 
 type ErrorBalanceValue struct {
 	Balance float64

@@ -61,7 +61,7 @@ func (t *token) Data() map[string]interface{} {
 }
 
 func (t *token) Updates() map[string]interface{} {
-	panic("not implemented") // TODO: Implement
+	return nil
 }
 
 func (t *token) AddRecharge(value int, deviceID uint, typeT uint, consecutive uint) {

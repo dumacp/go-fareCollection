@@ -9,6 +9,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
+	"github.com/dumacp/go-fareCollection/internal/recharge"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/looplab/fsm"
@@ -69,9 +70,17 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if err := json.Unmarshal(data, &mess); err != nil {
 				return fmt.Errorf("QR error: %w", err)
 			}
-			logs.LogBuild.Printf("NewQR: %s", msg.Value)
+			logs.LogInfo.Printf("NewQR: %s", msg.Value)
 			switch strings.ToUpper(mess.Type) {
 
+			case "PMRT":
+				rechg := &recharge.RechargeQR{}
+				if err := json.Unmarshal(mess.Value, rechg); err != nil {
+					return fmt.Errorf("QR error: %w", err)
+				}
+				if ctx.Parent() != nil {
+					ctx.Send(ctx.Parent(), rechg)
+				}
 			case "DCIT":
 				sendMsg := new(parameters.ConfigParameters)
 				if err := json.Unmarshal(mess.Value, sendMsg); err != nil {

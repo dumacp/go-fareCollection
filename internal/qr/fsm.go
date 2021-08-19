@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"github.com/dumacp/go-logs/pkg/logs"
@@ -63,7 +62,7 @@ func NewFSM(callbacks fsm.Callbacks) *fsm.FSM {
 			}
 		},
 		"enter_state": func(e *fsm.Event) {
-			log.Printf("FSM APP, state src: %s, state dst: %s", e.Src, e.Dst)
+			logs.LogBuild.Printf("FSM QR, state src: %s, state dst: %s", e.Src, e.Dst)
 		},
 
 		// "leave_closed": func(e *fsm.Event) {

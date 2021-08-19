@@ -23,6 +23,12 @@ type ConfigParameters struct {
 	PaymentItinerary int   `json:"id"`
 }
 
+type AppParameters struct {
+	Seq     uint `json:"seq"`
+	Inputs  int  `json:"inputs"`
+	Outputs int  `json:"outputs"`
+}
+
 type Parameters struct {
 	ID               string   `json:"id"`
 	Timestamp        int64    `json:"timestamp"`
@@ -31,6 +37,10 @@ type Parameters struct {
 	PaymentItinerary int      `json:"paymentItinerary"`
 	RestrictiveList  []string `json:"restrictiveList"`
 	Timeout          int      `json:"timeout"`
+	Inputs           int      `json:"imputs"`
+	Outputs          int      `json:"outputs"`
+	Seq              uint     `json:"seq"`
+	DevSerial        int      `json:"devSerial"`
 }
 
 func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
@@ -38,6 +48,7 @@ func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
 	p.PaymentMode = params.Mode()
 	p.RestrictiveList = params.RestrictiveList()
 	p.Timeout = params.Timeout()
+	p.DevSerial = params.Serial()
 	p.Timestamp = params.Timestamp
 	return p
 }
@@ -47,6 +58,16 @@ func (p *Parameters) FromConfig(params *ConfigParameters) *Parameters {
 	// 	return p
 	// }
 	p.PaymentItinerary = params.PaymentItinerary
+	return p
+}
+
+func (p *Parameters) FromApp(params *AppParameters) *Parameters {
+	// if params.Expiration > time.Now().UnixNano()/1000_000 {
+	// 	return p
+	// }
+	p.Inputs = params.Inputs
+	p.Outputs = params.Outputs
+	p.Seq = params.Seq
 	return p
 }
 
@@ -94,6 +115,23 @@ func (p *PlatformParameters) Timeout() int {
 	}
 
 	res, err := strconv.Atoi(timeouts)
+	if err != nil {
+		return 0
+	}
+
+	return res
+}
+
+func (p *PlatformParameters) Serial() int {
+	if p.Props == nil {
+		return 0
+	}
+	serial, ok := p.Props["DEV_SERIAL"]
+	if !ok {
+		return 0
+	}
+
+	res, err := strconv.Atoi(serial)
 	if err != nil {
 		return 0
 	}

@@ -139,7 +139,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 
 				a.fareMap = CreateTree(a.farePolicies)
-				logs.LogBuild.Printf("fare map: %#v", a.fareMap)
+				logs.LogInfo.Printf("fare map: %#v", a.fareMap)
 				return nil
 			}(); err != nil {
 				logs.LogError.Println(err)

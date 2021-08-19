@@ -86,9 +86,10 @@ func Open(ctx *actor.RootContext, pathdb string) (DB, error) {
 		return nil, err
 	}
 	instance.pid = pid
-	instance.initFSM()
+
 	instance.behavior = make(actor.Behavior, 0)
 	instance.behavior.Become(instance.CloseState)
+	instance.initFSM()
 
 	return instance, nil
 }

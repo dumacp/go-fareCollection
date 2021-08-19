@@ -97,6 +97,27 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
+	case *AppParameters:
+		logs.LogBuild.Printf("parse params: %+v", msg)
+		if a.parameters == nil {
+			a.parameters = new(Parameters)
+		}
+		a.parameters.FromApp(msg)
+		data, err := json.Marshal(a.parameters)
+		if err != nil {
+			logs.LogWarn.Printf("parse params err: %s", err)
+			break
+		}
+		if a.db != nil {
+			ctx.Send(a.db, &database.MsgUpdateData{
+				Database:   databaseName,
+				Collection: collectionNameData,
+				ID:         a.parameters.ID,
+				Data:       data,
+			})
+		}
+		logs.LogBuild.Printf("params: %+v", a.parameters)
+		ctx.Send(ctx.Self(), &MsgPublish{})
 	case *ConfigParameters:
 		logs.LogBuild.Printf("parse params: %+v", msg)
 		if a.parameters == nil {

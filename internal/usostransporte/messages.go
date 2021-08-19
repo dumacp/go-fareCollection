@@ -3,9 +3,6 @@ package usostransporte
 type MsgTick struct {
 }
 
-type MsgGetParameters struct {
-}
-
 type MsgUso struct {
 	Data *UsoTransporte
 }

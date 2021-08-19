@@ -23,6 +23,14 @@ message MsgPayment{
    map<string, string> raw = 4;
 }
 
+message MsgRecharge{
+	uint64  pid = 1;
+	string type = 2;
+   string pocket = 3;
+   int32 value = 4;
+   int64 exp = 5;
+}
+
 
 message MsgWritePayment{
 	uint64  uid = 1;

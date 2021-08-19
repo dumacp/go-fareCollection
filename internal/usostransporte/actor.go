@@ -37,7 +37,7 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrived in paramActor: %s, %T, %s",
+	logs.LogBuild.Printf("Message arrived in usosActor: %s, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
@@ -56,13 +56,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 		a.quit = make(chan int)
-		go tick(ctx, 60*time.Minute, a.quit)
+		go tick(ctx, 60*time.Second, a.quit)
 
 	case *actor.Stopping:
 		close(a.quit)
 	case *MsgTick:
-		ctx.Send(ctx.Self(), &MsgGetParameters{})
-
+		ctx.Send(ctx.Self(), &MsgGetInDB{})
 	case *MsgUso:
 		if err := func() error {
 			uso := msg.Data
@@ -84,7 +83,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 				return fmt.Errorf("send uso err post: %s, %w", resp, err)
 			} else {
-				logs.LogBuild.Printf("response set uso: %s", resp)
+				logs.LogInfo.Printf("response set uso: %s", resp)
 			}
 			return nil
 		}(); err != nil {
@@ -133,14 +132,10 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
 	t2 := time.After(3 * time.Second)
-	t3 := time.After(2 * time.Second)
 	for {
 		select {
-		case <-t3:
-			rootctx.Send(self, &MsgGetInDB{})
 		case <-t2:
 			rootctx.Send(self, &MsgTick{})
-			rootctx.Send(self, &MsgPublish{})
 		case <-t1.C:
 			rootctx.Send(self, &MsgTick{})
 		case <-quit:
