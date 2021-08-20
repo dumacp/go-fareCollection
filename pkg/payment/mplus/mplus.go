@@ -7,9 +7,10 @@ import (
 )
 
 type mplus struct {
+	id            string
 	ttype         string
-	uid           uint64
-	id            uint
+	mid           uint64
+	pid           uint
 	historical    []payment.Historical
 	balance       int
 	profileID     uint
@@ -25,9 +26,13 @@ type mplus struct {
 	actualMap     map[string]interface{}
 	updateMap     map[string]interface{}
 	fareID        uint
+	coord         string
 	err           string
 }
 
+func (p *mplus) ID() string {
+	return p.id
+}
 func (p *mplus) Type() string {
 	return p.ttype
 }
@@ -37,11 +42,11 @@ func (p *mplus) Data() map[string]interface{} {
 func (p *mplus) Updates() map[string]interface{} {
 	return p.updateMap
 }
-func (p *mplus) UID() uint64 {
-	return p.uid
+func (p *mplus) MID() uint64 {
+	return p.mid
 }
-func (p *mplus) ID() uint {
-	return p.id
+func (p *mplus) PID() uint {
+	return p.pid
 }
 func (p *mplus) ProfileID() uint {
 	return p.profileID
@@ -74,6 +79,14 @@ func (p *mplus) SetLock() {
 		p.updateMap = make(map[string]interface{})
 	}
 	p.updateMap[BLOQUEO] = 1
+}
+
+func (p *mplus) SetCoord(data string) {
+	p.coord = data
+}
+
+func (p *mplus) Coord() string {
+	return p.coord
 }
 
 func (p *mplus) SetError(err string) {

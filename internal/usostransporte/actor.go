@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	defaultURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/fare-transaction"
+	// defaultURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/fare-transaction"
+	defaultURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/payment-medium-transaction"
 	defaultUsername = "dev.nebulae"
 	// filterHttpQuery    = "?page=%d&count=%d&active=true"
 	defaultPassword    = "uno.2.tres"

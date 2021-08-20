@@ -8,7 +8,7 @@ import (
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 )
 
-func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
+func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) error {
 	if len(p.recharged) <= 0 {
 		p.recharged = make([]payment.HistoricalRecharge, 0)
 		p.recharged = append(p.recharged, &historicalRecharge{})
@@ -36,6 +36,7 @@ func (p *mplus) AddRecharge(value int, deviceID, typeT, consecutive uint) {
 			return p.recharged[i].TimeTransaction().Before(p.recharged[j].TimeTransaction())
 		},
 	)
+	return p.AddBalance(value)
 }
 
 func (p *mplus) Recharged() []payment.HistoricalRecharge {

@@ -17,7 +17,7 @@ func (t *token) ApplyFare(data interface{}) (interface{}, error) {
 }
 
 func (t *token) Balance() int {
-	return int(t.id)
+	return int(t.pid)
 }
 
 func (t *token) FareID() uint {

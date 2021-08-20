@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,10 +75,24 @@ func (a *Actor) Receive(ctx actor.Context) {
 			switch strings.ToUpper(mess.Type) {
 
 			case "PMRT":
-				rechg := &recharge.RechargeQR{}
-				if err := json.Unmarshal(mess.Value, rechg); err != nil {
+				rechQR := new(recharge.RechargeQR)
+				if err := json.Unmarshal(mess.Value, rechQR); err != nil {
 					return fmt.Errorf("QR error: %w", err)
 				}
+				logs.LogInfo.Printf("PMRT: %+v", rechQR)
+				rechg := new(recharge.Recharge)
+				rechg.Exp = time.Unix(rechQR.Exp/1000, (rechQR.Exp%1000)*1_000_0000)
+				varSplit := strings.Split(rechQR.PID, "-")
+				id := 0
+				if len(varSplit) > 0 {
+					id, _ = strconv.Atoi(varSplit[len(varSplit)-1])
+				}
+				rechg.PID = uint(id)
+				rechg.TID = uint(rechQR.TID)
+				rechg.Value = rechQR.Value
+
+				logs.LogInfo.Printf("PMRT: %+v", rechg)
+
 				if ctx.Parent() != nil {
 					ctx.Send(ctx.Parent(), rechg)
 				}

@@ -60,7 +60,6 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 		},
 		beforeEvent(eCardValidated): func(e *fsm.Event) {
 			a.lastTime = time.Now()
-			a.inputs++
 			value := ""
 			if e.Args != nil && len(e.Args) > 0 {
 				switch v := e.Args[0].(type) {
@@ -130,8 +129,8 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 		sStop,
 		fsm.Events{
 			{Name: eStarted, Src: []string{sStop}, Dst: sStart},
-			{Name: eCardValidated, Src: []string{sDetectTag}, Dst: sValidationCard},
-			{Name: eQRValidated, Src: []string{sDetectTag}, Dst: sValidationQR},
+			{Name: eCardValidated, Src: []string{sDetectTag, sError}, Dst: sValidationCard},
+			{Name: eQRValidated, Src: []string{sDetectTag, sError}, Dst: sValidationQR},
 			{Name: eError, Src: []string{sDetectTag}, Dst: sError},
 			{Name: eWait, Src: []string{
 				sStart,
@@ -196,7 +195,7 @@ func (a *Actor) RunFSM() {
 						break
 					}
 				case sError:
-					if time.Now().Add(-time.Duration(a.timeout) * time.Millisecond).After(a.lastTime) {
+					if time.Now().Add(-10 * time.Second).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}

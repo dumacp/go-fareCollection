@@ -3,9 +3,11 @@ package token
 import "github.com/dumacp/go-fareCollection/pkg/payment"
 
 type token struct {
+	id            string
 	ttype         string
 	pin           int
-	id            uint
+	pid           uint
+	coord         string
 	data          map[string]interface{}
 	rawDataBefore interface{}
 	rawDataAfter  interface{}
@@ -15,12 +17,16 @@ func (t *token) Type() string {
 	return t.ttype
 }
 
-func (t *token) UID() uint64 {
-	return uint64(t.id)
+func (t *token) ID() string {
+	return t.id
 }
 
-func (t *token) ID() uint {
-	return t.id
+func (t *token) MID() uint64 {
+	return uint64(t.pid)
+}
+
+func (t *token) PID() uint {
+	return t.pid
 }
 
 func (t *token) Historical() []payment.Historical {
@@ -64,7 +70,7 @@ func (t *token) Updates() map[string]interface{} {
 	return nil
 }
 
-func (t *token) AddRecharge(value int, deviceID uint, typeT uint, consecutive uint) {
+func (t *token) AddRecharge(value int, deviceID uint, typeT uint, consecutive uint) error {
 	panic("not implemented") // TODO: Implement
 }
 
@@ -78,6 +84,14 @@ func (t *token) SetProfile(_ uint) {
 
 func (t *token) SetLock() {
 	panic("not implemented") // TODO: Implement
+}
+
+func (t *token) SetCoord(data string) {
+	t.coord = data
+}
+
+func (t *token) Coord() string {
+	return t.coord
 }
 
 func (t *token) SetError(err string) {

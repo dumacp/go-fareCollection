@@ -14,6 +14,9 @@ type UsoTransporte struct {
 	Error                  *Error      `json:"error"`
 	Coord                  string      `json:"coord"`
 	TransactionType        string      `json:"transactionType"`
+	TransactionTime        int64       `json:"timestamp"`
+	RechargeValue          int         `json:"rechargeValue"`
+	RechargeTokenId        int         `json:"rechargeTokenId"`
 	// CountTrySend          int     `json:"trysend,omitempty"`
 }
 

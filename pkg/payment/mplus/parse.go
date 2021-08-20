@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dumacp/go-fareCollection/pkg/payment"
+	"github.com/google/uuid"
 )
 
 func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payment.Payment {
@@ -20,7 +21,7 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 
 	m := &mplus{}
 	m.balance = 0x7FFFFf
-	m.uid = uid
+	m.mid = uid
 	m.ttype = ttype
 	m.actualMap = mapa
 
@@ -47,7 +48,7 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 				m.lock = true
 			}
 		case k == NUMEROTARJETA:
-			m.id, _ = value.(uint)
+			m.pid, _ = value.(uint)
 		case k == VERSIONLAYOUT:
 			m.versionLayout, _ = value.(uint)
 		case k == PMR:
@@ -148,6 +149,9 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 		},
 	)
 	m.recharged = resultr
+
+	id, _ := uuid.NewUUID()
+	m.id = id.String()
 
 	return m
 }

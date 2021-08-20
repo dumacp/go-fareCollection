@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dumacp/go-fareCollection/pkg/payment"
+	"github.com/google/uuid"
 )
 
 func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
@@ -16,12 +17,12 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 		case "pid":
 			switch v := value.(type) {
 			case int:
-				t.id = uint(v)
+				t.pid = uint(v)
 			case string:
 				varsplit := strings.Split(v, "-")
 				if len(varsplit) > 0 {
 					num, _ := strconv.Atoi(varsplit[len(varsplit)-1])
-					t.id = uint(num)
+					t.pid = uint(num)
 				}
 			}
 		case "pin":
@@ -29,5 +30,7 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 			t.pin, _ = strconv.Atoi(v)
 		}
 	}
+	id, _ := uuid.NewUUID()
+	t.id = id.String()
 	return t
 }

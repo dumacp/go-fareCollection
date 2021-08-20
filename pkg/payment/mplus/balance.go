@@ -55,39 +55,76 @@ func (p *mplus) ApplyFare(data interface{}) (interface{}, error) {
 
 func (p *mplus) AddBalance(value int) error {
 
-	if p.balance <= 0 && value < 0 {
+	if p.balance+value < 0 {
 		return &payment.ErrorBalanceValue{Balance: float64(p.balance), Cost: float64(value)}
 	}
 	p.balance += value
 	saldoTarjeta, _ := p.actualMap[SaldoTarjeta].(int)
 	saldoTarjetaBackup, _ := p.actualMap[SaldoTarjetaBackup].(int)
-	if value <= 0 {
-		if saldoTarjeta > saldoTarjetaBackup {
-			diff := saldoTarjeta - saldoTarjetaBackup
-			saldoTarjeta += (value - diff)
+
+	if saldoTarjeta < saldoTarjetaBackup {
+		if p.balance < saldoTarjeta {
+			saldoTarjetaBackup = p.balance
 		} else {
-			diff := saldoTarjetaBackup - saldoTarjeta
-			saldoTarjetaBackup += (value - diff)
+			if p.balance < saldoTarjetaBackup {
+				saldoTarjeta = p.balance
+			} else {
+				saldoTarjeta = p.balance
+				saldoTarjetaBackup = p.balance
+			}
 		}
 	} else {
-		if saldoTarjeta > saldoTarjetaBackup {
-			diff := saldoTarjeta - saldoTarjetaBackup
-			if diff >= value {
-				saldoTarjetaBackup += value
-			} else {
-				saldoTarjeta += (value - diff)
-				saldoTarjetaBackup += value
-			}
+		if p.balance < saldoTarjetaBackup {
+			saldoTarjeta = p.balance
 		} else {
-			diff := saldoTarjetaBackup - saldoTarjeta
-			if diff >= value {
-				saldoTarjeta += value
+			if p.balance < saldoTarjeta {
+				saldoTarjetaBackup = p.balance
 			} else {
-				saldoTarjetaBackup += (value - diff)
-				saldoTarjeta += value
+				saldoTarjetaBackup = p.balance
+				saldoTarjeta = p.balance
 			}
 		}
 	}
+	// saldoTarjeta := 0
+	// saldoTarjetaBackup := 0
+	// if _, ok := p.updateMap[SaldoTarjeta]; !ok {
+	// 	saldoTarjeta, _ = p.actualMap[SaldoTarjeta].(int)
+	// } else {
+	// 	saldoTarjeta, _ = p.updateMap[SaldoTarjeta].(int)
+	// }
+	// if _, ok := p.updateMap[SaldoTarjetaBackup]; !ok {
+	// 	saldoTarjetaBackup, _ = p.actualMap[SaldoTarjetaBackup].(int)
+	// } else {
+	// 	saldoTarjetaBackup, _ = p.updateMap[SaldoTarjetaBackup].(int)
+	// }
+
+	// if value <= 0 {
+	// 	if saldoTarjeta > saldoTarjetaBackup {
+	// 		diff := saldoTarjeta - saldoTarjetaBackup
+	// 		saldoTarjeta += (value - diff)
+	// 	} else {
+	// 		diff := saldoTarjetaBackup - saldoTarjeta
+	// 		saldoTarjetaBackup += (value - diff)
+	// 	}
+	// } else {
+	// 	if saldoTarjeta > saldoTarjetaBackup {
+	// 		diff := saldoTarjeta - saldoTarjetaBackup
+	// 		if diff >= value {
+	// 			saldoTarjetaBackup += value
+	// 		} else {
+	// 			saldoTarjeta += (value - diff)
+	// 			saldoTarjetaBackup += value
+	// 		}
+	// 	} else {
+	// 		diff := saldoTarjetaBackup - saldoTarjeta
+	// 		if diff >= value {
+	// 			saldoTarjeta += value
+	// 		} else {
+	// 			saldoTarjetaBackup += (value - diff)
+	// 			saldoTarjeta += value
+	// 		}
+	// 	}
+	// }
 	if p.updateMap == nil {
 		p.updateMap = make(map[string]interface{})
 	}
@@ -95,7 +132,6 @@ func (p *mplus) AddBalance(value int) error {
 	p.updateMap[SaldoTarjetaBackup] = saldoTarjetaBackup
 
 	return nil
-
 }
 
 func (p *mplus) Historical() []payment.Historical {

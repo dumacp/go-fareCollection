@@ -2,8 +2,6 @@ package business
 
 import (
 	"errors"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/internal/recharge"
@@ -11,22 +9,15 @@ import (
 )
 
 func RechargeQR(paym payment.Payment, deviceID uint, seq uint,
-	data *recharge.RechargeQR) (map[string]interface{}, error) {
+	data *recharge.Recharge) (map[string]interface{}, error) {
 	if data == nil {
 		return nil, nil
 	}
-	exp := time.Unix(data.Exp/1000, (data.Exp%1000)*1_000_0000)
-	if exp.Before(time.Now()) {
+	if data.Exp.Before(time.Now()) {
 		return nil, nil
 	}
-
-	varSplit := strings.Split(data.PID, "-")
-	id := 0
-	if len(varSplit) > 0 {
-		id, _ = strconv.Atoi(varSplit[len(varSplit)-1])
-	}
-	if paym.ID() != uint(id) {
-		return nil, errors.New("tarjeta no coincide con al recarga")
+	if paym.PID() != data.PID {
+		return nil, errors.New("tarjeta no coincide con la recarga")
 	}
 	if data.Value <= 0 {
 		return nil, errors.New("valor invalido")
@@ -34,7 +25,9 @@ func RechargeQR(paym payment.Payment, deviceID uint, seq uint,
 
 	//TODO: where get this param
 	ttype := 2
-	paym.AddRecharge(data.Value, deviceID, uint(ttype), seq)
+	if err := paym.AddRecharge(data.Value, deviceID, uint(ttype), seq); err != nil {
+		return nil, err
+	}
 
 	return paym.Updates(), nil
 }

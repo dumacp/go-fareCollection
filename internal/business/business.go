@@ -17,9 +17,7 @@ import (
 	"github.com/dumacp/go-logs/pkg/logs"
 )
 
-func ParsePayment(
-	msg *messages.MsgPayment,
-) (payment.Payment, error) {
+func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
 	/**/
 	jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
 	if err != nil {
@@ -71,7 +69,7 @@ func VerifyListRestrictive(ctx actor.Context, pidList *actor.PID, paym payment.P
 		}
 		resList, err := ctx.RequestFuture(pidList, &lists.MsgVerifyInList{
 			ListID: list,
-			ID:     []int64{int64(paym.ID())},
+			ID:     []int64{int64(paym.PID())},
 		}, 60*time.Millisecond).Result()
 		if err != nil {
 			return false, fmt.Errorf("get restrictive list err: %w", err)
@@ -117,7 +115,7 @@ func CalcUpdatesWithFare(ctx actor.Context, pidFare *actor.PID, deviceID int,
 		if pidFare == nil {
 			return nil, errors.New("pidFare not found")
 		}
-		resFare, err := ctx.RequestFuture(pidFare, getFare, 30*time.Millisecond).Result()
+		resFare, err := ctx.RequestFuture(pidFare, getFare, 60*time.Millisecond).Result()
 		if err != nil {
 			return nil, fmt.Errorf("get fare err: %w", err)
 		}

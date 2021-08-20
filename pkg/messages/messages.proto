@@ -23,25 +23,20 @@ message MsgPayment{
    map<string, string> raw = 4;
 }
 
-message MsgRecharge{
-	uint64  pid = 1;
-	string type = 2;
-   string pocket = 3;
-   int32 value = 4;
-   int64 exp = 5;
-}
-
-
 message MsgWritePayment{
 	uint64  uid = 1;
 	string type = 2;
 	map<string, Value> updates = 3;
+   int32 seq = 4;
+   bool alreadyUpdate = 5;
 }
 
 message MsgWritePaymentResponse{
 	uint64  uid = 1;
    string type = 2;
    map<string, string> raw = 3;
+   int32 seq = 4;
+   string samuid = 5;
 }
 
 message MsgWritePaymentError{
@@ -49,6 +44,7 @@ message MsgWritePaymentError{
    string error = 2;
    string type = 3;
    map<string, string> raw = 4;
+   string samuid = 5;
 }
 
 message RegisterFareActor{

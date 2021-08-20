@@ -37,7 +37,7 @@ type Parameters struct {
 	PaymentItinerary int      `json:"paymentItinerary"`
 	RestrictiveList  []string `json:"restrictiveList"`
 	Timeout          int      `json:"timeout"`
-	Inputs           int      `json:"imputs"`
+	Inputs           int      `json:"inputs"`
 	Outputs          int      `json:"outputs"`
 	Seq              uint     `json:"seq"`
 	DevSerial        int      `json:"devSerial"`
