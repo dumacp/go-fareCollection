@@ -19,6 +19,7 @@ const (
 	sValidationCard = "sValidationCard"
 	sValidationQR   = "sValidationQR"
 	sError          = "sError"
+	sOk             = "sOk"
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 	eCardDetected  = "eTagDetected"
 	eCardValidated = "eCardValidated"
 	eQRValidated   = "eQRValidated"
+	eOk            = "eOk"
 	eWait          = "eWait"
 	eError         = "eError"
 )
@@ -94,8 +96,39 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
 
 		},
+		beforeEvent(eOk): func(e *fsm.Event) {
+			a.lastTime = time.Now()
+			if e.Args != nil && len(e.Args) > 0 {
+				switch v := e.Args[0].(type) {
+				case []string:
+					a.ctx.Send(a.pidGraph, &graph.MsgOk{Value: v})
+				}
+			}
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+		},
 		enterState(sDetectTag): func(e *fsm.Event) {
-			a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+			// if e.Args != nil && len(e.Args) > 0 {
+			// 	switch v := e.Args[0].(type) {
+			// 	case []string:
+			//
+			// 		if len(v) > 0 {
+			// 			msg.Message = v[0]
+			// 		}
+			// 		if len(v) > 1 {
+			// 			msg.Ruta = v[1]
+			// 		}
+			// 		a.ctx.Send(a.pidGraph, msg)
+			// 		a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
+			// 	}
+			// }
+			msg := &graph.MsgWaitTag{
+				Message: "presente medio\r\nde pago",
+			}
+			if a.params != nil {
+				msg.Ruta = fmt.Sprintf("%d", a.params.PaymentItinerary)
+			}
+
+			a.ctx.Send(a.pidGraph, msg)
 			a.ctx.Send(a.pidPicto, &picto.MsgPictoOFF{})
 		},
 		beforeEvent(eError): func(e *fsm.Event) {
@@ -129,14 +162,16 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 		sStop,
 		fsm.Events{
 			{Name: eStarted, Src: []string{sStop}, Dst: sStart},
-			{Name: eCardValidated, Src: []string{sDetectTag, sError}, Dst: sValidationCard},
-			{Name: eQRValidated, Src: []string{sDetectTag, sError}, Dst: sValidationQR},
-			{Name: eError, Src: []string{sDetectTag}, Dst: sError},
+			{Name: eCardValidated, Src: []string{sDetectTag, sError, sOk}, Dst: sValidationCard},
+			{Name: eQRValidated, Src: []string{sDetectTag, sError, sOk}, Dst: sValidationQR},
+			{Name: eOk, Src: []string{sDetectTag, sError}, Dst: sOk},
+			{Name: eError, Src: []string{sDetectTag, sOk}, Dst: sError},
 			{Name: eWait, Src: []string{
 				sStart,
 				sValidationQR,
 				sValidationCard,
 				sError,
+				sOk,
 			}, Dst: sDetectTag},
 		},
 		callbacksfsm,
@@ -181,7 +216,6 @@ func (a *Actor) RunFSM() {
 				switch f.Current() {
 				case sStart:
 					a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
-					a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
 					f.Event(eWait)
 				case sDetectTag:
 				case sValidationCard:
@@ -195,12 +229,17 @@ func (a *Actor) RunFSM() {
 						break
 					}
 				case sError:
+					if time.Now().Add(-6 * time.Second).After(a.lastTime) {
+						a.fmachine.Event(eWait)
+						break
+					}
+				case sOk:
 					if time.Now().Add(-10 * time.Second).After(a.lastTime) {
 						a.fmachine.Event(eWait)
 						break
 					}
 				}
-				time.Sleep(300 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 
 			}
 		}(); err != nil {

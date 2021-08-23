@@ -88,7 +88,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 					id, _ = strconv.Atoi(varSplit[len(varSplit)-1])
 				}
 				rechg.PID = uint(id)
-				rechg.TID = uint(rechQR.TID)
+				rechg.TID = rechQR.TID
 				rechg.Value = rechQR.Value
 
 				logs.LogInfo.Printf("PMRT: %+v", rechg)

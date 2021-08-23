@@ -277,8 +277,8 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 						case <-stop:
 						default:
 							close(stop)
-							return
 						}
+						return
 					}
 				}
 			}(ctx, pidSender)

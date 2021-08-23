@@ -25,6 +25,7 @@ type HistoricalRecharge interface {
 	TimeTransaction() time.Time
 	ConsecutiveID() uint
 	TypeTransaction() uint
+	RechargeProp(string) interface{}
 
 	SetIndex(int)
 	SetDeviceID(uint)
@@ -32,6 +33,7 @@ type HistoricalRecharge interface {
 	SetTimeTransaction(time.Time)
 	SetConsecutiveID(uint)
 	SetTypeTransaction(uint)
+	SetRechargeProp(string, interface{})
 }
 
 type Payment interface {

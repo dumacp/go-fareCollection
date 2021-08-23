@@ -200,11 +200,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 				// }
 				q.LastFare = append(q.LastFare, fare)
 			}
-			logs.LogBuild.Printf("fare query: %#v", q)
+			logs.LogInfo.Printf("fare query: %#v", q)
 			fare := a.fareMap.FindFare(q)
 			if fare == nil {
 				return nil, errors.New("fare Policy not found")
 			}
+			logs.LogInfo.Printf("fare found out: %#v", q)
 			return fare, nil
 		}(); err != nil {
 			if ctx.Sender() != nil {

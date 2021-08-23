@@ -1,7 +1,6 @@
 package business
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,8 +16,21 @@ import (
 	"github.com/dumacp/go-logs/pkg/logs"
 )
 
+const (
+	paymT1 = iota
+	paymT2
+)
+
 func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
-	/**/
+	paymType := 0
+	switch msg.GetType() {
+	case "MIFARE_PLUS_EV2_4K":
+		paymType = paymT1
+	case "ENDUSER_QR":
+		paymType = paymT2
+	}
+
+	/**
 	jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
 	if err != nil {
 		logs.LogError.Println(err)
@@ -47,29 +59,33 @@ func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
 	logs.LogBuild.Printf("tag map: %v", mcard)
 	// v, err := payment.ValidationTag(lastMcard, 1028, 1290)
 
-	switch msg.GetType() {
-	case "MIFARE_PLUS_EV2_4K":
+	switch paymType {
+	case paymT1:
 		paym = mplus.ParseToPayment(msg.Uid, msg.GetType(), mcard)
-	case "ENDUSER_QR":
+	case paymT2:
 		paym = token.ParseToPayment(msg.Uid, mcard)
 	}
 
 	raw := msg.GetRaw()
 	raw["mv"] = fmt.Sprintf("%d", paym.VersionLayout())
+	switch paymType {
+	case paymT1:
+		raw["mv"] = "3"
+	}
 	paym.SetRawDataBefore(raw)
 	return paym, nil
 
 }
 
-func VerifyListRestrictive(ctx actor.Context, pidList *actor.PID, paym payment.Payment,
+func VerifyListRestrictive(ctx actor.Context, pidList *actor.PID, paymType string, paymID int64,
 	listRestrictive map[string]string) (bool, error) {
 	for list, code := range listRestrictive {
-		if code != paym.Type() {
+		if code != paymType {
 			continue
 		}
 		resList, err := ctx.RequestFuture(pidList, &lists.MsgVerifyInList{
 			ListID: list,
-			ID:     []int64{int64(paym.PID())},
+			ID:     []int64{paymID},
 		}, 60*time.Millisecond).Result()
 		if err != nil {
 			return false, fmt.Errorf("get restrictive list err: %w", err)

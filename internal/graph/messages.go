@@ -1,6 +1,9 @@
 package graph
 
-type MsgWaitTag struct{}
+type MsgWaitTag struct {
+	Message string
+	Ruta    string
+}
 type MsgWriteError struct{}
 type MsgQrError struct{}
 type MsgQrValue struct {
@@ -10,6 +13,9 @@ type MsgBalanceError struct {
 	Value string
 }
 type MsgError struct {
+	Value []string
+}
+type MsgOk struct {
 	Value []string
 }
 type MsgValidationTag struct {
@@ -24,6 +30,7 @@ type MsgNewQr struct {
 type MsgRef struct {
 	Version string
 	Ruta    string
+	Device  string
 }
 type MsgCount struct {
 	Value int

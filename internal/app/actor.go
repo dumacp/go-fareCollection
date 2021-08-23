@@ -29,6 +29,7 @@ import (
 
 type Actor struct {
 	deviceID    string
+	version     string
 	deviceIDnum int
 	// lastTag        uint64
 	// lastTimeDetect time.Time
@@ -65,9 +66,10 @@ type Actor struct {
 	quit            chan int
 }
 
-func NewActor(id string) actor.Actor {
+func NewActor(id string, version string) actor.Actor {
 	a := &Actor{}
 	a.deviceID = id
+	a.version = version
 	varSplit := strings.Split(id, "-")
 	if len(varSplit) > 0 {
 		a.deviceIDnum, _ = strconv.Atoi(varSplit[len(varSplit)-1])
@@ -85,7 +87,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Stopping:
-		ctx.Send(ctx.Self(), &MsgWriteAppParamas{})
+		ctx.Send(ctx.Self(), &MsgWriteAppParams{})
 		ctx.Send(ctx.Self(), &MsgWriteErrorVerify{})
 	case *actor.Started:
 		if err := func() error {
@@ -125,10 +127,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 			panic(err)
 		}
 		a.fmachine.Event(eStarted)
-		ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
+		// ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
 		a.quit = make(chan int)
 		go tick(ctx, 60*time.Minute, a.quit)
-	case *MsgWriteAppParamas:
+	case *MsgWriteAppParams:
 		if a.pidParams != nil {
 			ctx.Send(a.pidParams, &parameters.AppParameters{
 				Seq:     uint(a.seq),
@@ -140,6 +142,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if a.pidParams != nil {
 			ctx.Send(a.pidParams, msg)
 		}
+		a.fmachine.Event(eOk, []string{"configuración", "datos actualizados"})
 	case *parameters.MsgParameters:
 		if ctx.Sender() != nil {
 			a.pidParams = ctx.Sender()
@@ -150,15 +153,32 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.seq = int(a.params.Seq)
 		}
 		if a.params.Inputs >= a.inputs {
+			if a.pidGraph != nil {
+				a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.params.Inputs})
+			}
 			a.inputs = int(a.params.Inputs)
 		}
 		if a.params.Outputs >= a.outputs {
 			a.outputs = int(a.params.Outputs)
 		}
+		if a.params.DevSerial > 0 {
+			if a.pidGraph != nil {
+				a.ctx.Send(a.pidGraph, &graph.MsgRef{
+					Device:  fmt.Sprintf("%s-%d", a.deviceID, a.deviceIDnum),
+					Version: a.version,
+					Ruta:    fmt.Sprintf("%d", a.params.PaymentItinerary),
+				})
+			}
+			a.deviceIDnum = a.params.DevSerial
+		}
 		if a.pidList != nil {
 			for _, list := range a.params.RestrictiveList {
 				ctx.Request(a.pidList, &lists.MsgWatchList{ID: list})
 			}
+		}
+		if a.pidGraph != nil {
+			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.deviceIDnum})
+			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
 		}
 	case *lists.MsgWatchListResponse:
 		if a.listRestrictive == nil {
@@ -240,17 +260,21 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.recharge = nil
 			break
 		}
+		a.fmachine.Event(eOk, []string{"ticket de recarga", fmt.Sprintf("(%d) ubique la tarjeta", msg.Value)})
 		a.recharge = msg
 		a.recharge.Seq = a.seq + 1
+		a.recharge.DeviceID = a.deviceIDnum
 	case *messages.MsgPayment:
 		/**/
 
 		updates, err := func() (map[string]interface{}, error) {
+			logs.LogInfo.Printf("detect uid: %d", msg.Uid)
 			paym, err := business.ParsePayment(msg)
+			logs.LogInfo.Printf("parse uid: %d", msg.Uid)
 			if err != nil {
 				return nil, err
 			}
-			ok, err := business.VerifyListRestrictive(ctx, a.pidList, paym, a.listRestrictive)
+			ok, err := business.VerifyListRestrictive(ctx, a.pidList, paym.Type(), int64(paym.PID()), a.listRestrictive)
 			if err != nil {
 				logs.LogWarn.Println(err)
 			}
@@ -269,17 +293,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 				lastPaym := a.paym[msg.GetUid()]
 				if business.Rewrite(paym, lastPaym, a.lastWriteError) {
 					logs.LogInfo.Printf("rewrite try, uid: %d", msg.Uid)
-					defer func() {
-						logs.LogInfo.Printf("payment last (%d) updates: %+v", lastPaym.PID(), lastPaym.Updates())
-						a.paym[msg.GetUid()] = lastPaym
-						// paym.SetRawDataBefore(lastPaym.RawDataBefore())
-					}()
+					logs.LogInfo.Printf("payment last (%d) updates: %+v", lastPaym.PID(), lastPaym.Updates())
+					a.paym[msg.GetUid()] = lastPaym
 					return lastPaym.Updates(), nil
 				}
-				defer func() {
-					logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
-					a.paym[msg.GetUid()] = paym
-				}()
+				logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
+				a.paym[msg.GetUid()] = paym
 				if lastPaym != nil && paym.MID() != lastPaym.MID() {
 					lasth := lastPaym.Historical()
 
@@ -307,28 +326,36 @@ func (a *Actor) Receive(ctx actor.Context) {
 					ctx.Send(ctx.Self(), uso)
 				}
 				if a.recharge != nil {
-					if _, err := business.RechargeQR(paym,
-						uint(a.deviceIDnum), uint(a.seq), a.recharge); err != nil {
+					defer func() {
 						a.recharge = nil
+					}()
+					if _, err := business.RechargeQR(paym, a.recharge); err != nil {
 						return nil, NewErrorScreen("error recarga", err.Error())
 					}
 				}
-				return business.CalcUpdatesWithFare(ctx, a.pidFare, a.deviceIDnum, paym, a.params)
+				updates, err := business.CalcUpdatesWithFare(ctx, a.pidFare, a.deviceIDnum, paym, a.params)
+				if err != nil {
+					if errors.Is(err, payment.ErrorBalance) {
+						return nil, NewErrorScreen("saldo insuficiente", err.Error())
+					} else {
+						return nil, err
+					}
+				}
+				return updates, nil
 			case "ENDUSER_QR":
-				defer func() {
-					logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
-					a.paym[msg.GetUid()] = paym
-				}()
+				logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
+				a.paym[msg.GetUid()] = paym
 				return business.CalcUpdatesQR(paym, &a.oldRand, &a.newRand)
 			default:
-				defer func() {
-					logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
-					a.paym[msg.GetUid()] = paym
-				}()
+				logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
+				a.paym[msg.GetUid()] = paym
 				return nil, fmt.Errorf("payment type not found: %s, %s", msg.Type, paym.Type())
 			}
 		}()
 		if err != nil {
+			if a.paym != nil {
+				delete(a.paym, msg.GetUid())
+			}
 			a.fmachine.Event(eError, err)
 			logs.LogError.Println(err)
 			break
@@ -361,6 +388,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 		lastPaym := a.paym[msg.GetUid()]
 		raw := msg.GetRaw()
 		raw["mv"] = fmt.Sprintf("%d", lastPaym.VersionLayout())
+		switch msg.GetType() {
+		case "MIFARE_PLUS_EV2_4K":
+			raw["mv"] = "3"
+		}
 		lastPaym.SetRawDataAfter(raw)
 		lastPaym.SetError(msg.Error)
 		coord := ""
@@ -381,7 +412,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 		lastPaym.SetCoord(coord)
 		a.fmachine.Event(eError, NewErrorScreen("error de escritura", "vuelva a ubicar la tarjeta"))
 		logs.LogError.Printf("error de escritura, uid: %d, err: %s", msg.Uid, msg.Error)
-
 	case *messages.MsgWritePaymentResponse:
 		if a.paym == nil {
 			a.paym = make(map[uint64]payment.Payment)
@@ -393,7 +423,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.inputs++
 		a.seq++
 
-		logs.LogInfo.Printf("payment map: %+v, updates: %+v", lastPaym.Data(), lastPaym.Updates())
+		logs.LogInfo.Printf("payment write map: %+v, updates: %+v", lastPaym.Data(), lastPaym.Updates())
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
 		a.fmachine.Event(eCardValidated, lastPaym.Balance())
 
@@ -408,6 +438,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 		raw := msg.GetRaw()
 		raw["mv"] = fmt.Sprintf("%d", lastPaym.VersionLayout())
+		switch msg.GetType() {
+		case "MIFARE_PLUS_EV2_4K":
+			raw["mv"] = "3"
+		}
 		lastPaym.SetRawDataAfter(raw)
 
 		uso := &usostransporte.UsoTransporte{
@@ -431,12 +465,24 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		switch msg.Type {
 		case "MIFARE_PLUS_EV2_4K":
-			if a.recharge != nil {
-				logs.LogInfo.Printf("payment recharged: %+v", a.recharge)
-				if a.recharge.Seq == int(msg.GetSeq()) {
-					uso.TransactionType = "TFC_WITH_BALANCE_RECHARGE"
-					uso.RechargeTokenId = int(a.recharge.TID)
-					uso.RechargeValue = a.recharge.Value
+			hr := lastPaym.Recharged()
+			// for i, v := range hr {
+			// 	logs.LogInfo.Printf("last hist %d: %+v", i, v)
+			// }
+			// logs.LogInfo.Printf("msg seq: %d", msg.Seq)
+
+			if len(hr) > 0 && hr[len(hr)-1].ConsecutiveID() == uint(msg.GetSeq()) &&
+				hr[len(hr)-1].DeviceID() == uint(a.deviceIDnum) {
+				logs.LogInfo.Printf("payment recharged: %+v", hr[len(hr)-1])
+				uso.TransactionType = "TFC_WITH_BALANCE_RECHARGE"
+				// uso.RechargeTokenId = int(a.recharge.TID)
+				// uso.RechargeValue = a.recharge.Value
+				// logs.LogInfo.Printf("last hist: %+v", hr[len(hr)-1])
+				if v := hr[len(hr)-1].RechargeProp("RechargeTokenId"); v != nil {
+					if tid, ok := v.(int); ok {
+						uso.RechargeTokenId = int(tid)
+						uso.RechargeValue = hr[len(hr)-1].Value()
+					}
 				}
 			}
 		}
@@ -489,7 +535,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}(); err != nil {
 			logs.LogError.Printf("QR error: %s", err)
 		}
-
 	case *qr.MsgNewRand:
 		a.oldRand = a.newRand
 		a.newRand = msg.Value

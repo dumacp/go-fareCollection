@@ -24,7 +24,7 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 		// case <-t1.C:
 		// 	rootctx.Send(self, &MsgTick{})
 		case <-tWrite.C:
-			rootctx.Send(self, &MsgWriteAppParamas{})
+			rootctx.Send(self, &MsgWriteAppParams{})
 		case <-quit:
 			return
 		}

@@ -17,5 +17,5 @@ func (e *ErrorBalanceValue) Unwrap() error {
 }
 
 func (e *ErrorBalanceValue) Error() string {
-	return fmt.Sprintf("saldo: %.2f", e.Balance)
+	return fmt.Sprintf("%.2f", e.Balance)
 }

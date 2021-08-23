@@ -18,6 +18,7 @@ type historicalRecharge struct {
 	// ItineraryID     int
 	value    int
 	deviceID uint
+	props    map[string]interface{}
 }
 
 func (h *historicalUse) FareID() uint {
@@ -106,4 +107,18 @@ func (h *historicalRecharge) SetConsecutiveID(consecutive uint) {
 
 func (h *historicalRecharge) SetTypeTransaction(typeTransaction uint) {
 	h.typeTransaction = typeTransaction
+}
+
+func (h *historicalRecharge) SetRechargeProp(key string, value interface{}) {
+	if h.props == nil {
+		h.props = make(map[string]interface{})
+	}
+	h.props[key] = value
+}
+
+func (h *historicalRecharge) RechargeProp(key string) interface{} {
+	if h.props == nil {
+		return nil
+	}
+	return h.props[key]
 }

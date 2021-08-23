@@ -57,7 +57,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 		a.quit = make(chan int)
-		go tick(ctx, 60*time.Minute, a.quit)
+		go tick(ctx, 10*time.Minute, a.quit)
 		//TODO:
 		// get http parameters
 	case *actor.Stopping:

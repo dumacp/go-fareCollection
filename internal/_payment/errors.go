@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-var ErrorBalance = errors.New("Balance error")
+var ErrorBalance = errors.New("balance error")
 
 type ErrorBalanceValue struct {
 	Balance float64
@@ -17,5 +17,5 @@ func (e *ErrorBalanceValue) Unwrap() error {
 }
 
 func (e *ErrorBalanceValue) Error() string {
-	return fmt.Sprintf("saldo: %.2f", e.Balance)
+	return fmt.Sprintf("%.2f", e.Balance)
 }

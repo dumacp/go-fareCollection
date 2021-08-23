@@ -2,7 +2,6 @@ package mplus
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +14,15 @@ import (
 func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payment.Payment {
 
 	// minorNumberInt32 := -2147483648
+	cid := make(chan string)
+	go func() {
+		defer close(cid)
+		id, _ := uuid.NewUUID()
+		select {
+		case cid <- id.String():
+		case <-time.After(300 * time.Millisecond):
+		}
+	}()
 
 	histu := make(map[string]payment.Historical)
 	histr := make(map[string]payment.HistoricalRecharge)
@@ -62,16 +70,22 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 			v, _ := value.(uint)
 			m.dateValidity = time.Unix(int64(v), int64(0))
 		case strings.HasPrefix(k, HISTORICO_USO):
-			re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_USO))
-			if err != nil {
+			// re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_USO))
+			// if err != nil {
+			// 	break
+			// }
+			// res := re.FindStringSubmatch(k)
+			// if len(res) <= 2 || len(res[1]) <= 0 {
+			// 	break
+			// }
+			// ind := res[2]
+			// key := res[1]
+			varSplit := strings.Split(k, "_")
+			if len(varSplit) < 3 {
 				break
 			}
-			res := re.FindStringSubmatch(k)
-			if len(res) <= 2 || len(res[1]) <= 0 {
-				break
-			}
-			ind := res[2]
-			key := res[1]
+			ind := varSplit[2]
+			key := fmt.Sprintf("%s_%s", varSplit[0], varSplit[1])
 			if _, ok := histu[ind]; !ok {
 				indx, _ := strconv.Atoi(ind)
 				histu[ind] = &historicalUse{index: indx}
@@ -91,16 +105,23 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 				histu[ind].SetItineraryID(v)
 			}
 		case strings.HasPrefix(k, HISTORICO_RECARGA):
-			re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_RECARGA))
-			if err != nil {
+			// re, err := regexp.Compile(fmt.Sprintf("(%s_.+)_([0-9])", HISTORICO_RECARGA))
+			// if err != nil {
+			// 	break
+			// }
+			// res := re.FindStringSubmatch(k)
+			// if len(res) <= 2 || len(res[1]) <= 0 {
+			// 	break
+			// }
+			// ind := res[2]
+			// key := res[1]
+			varSplit := strings.Split(k, "_")
+			if len(varSplit) < 3 {
 				break
 			}
-			res := re.FindStringSubmatch(k)
-			if len(res) <= 2 || len(res[1]) <= 0 {
-				break
-			}
-			ind := res[2]
-			key := res[1]
+			ind := varSplit[2]
+			key := fmt.Sprintf("%s_%s", varSplit[0], varSplit[1])
+
 			if _, ok := histr[ind]; !ok {
 				indx, _ := strconv.Atoi(ind)
 				histr[ind] = &historicalRecharge{index: indx}
@@ -150,8 +171,9 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 	)
 	m.recharged = resultr
 
-	id, _ := uuid.NewUUID()
-	m.id = id.String()
+	for id := range cid {
+		m.id = id
+	}
 
 	return m
 }

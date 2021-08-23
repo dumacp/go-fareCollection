@@ -33,7 +33,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *MsgWaitTag:
 		screen1 := &Screen{
 			ID:  1,
-			Msg: []string{"presente medio\r\nde pago", `TRONCAL 1`},
+			Msg: []string{msg.Message, msg.Ruta},
+			// Msg: []string{"presente medio\r\nde pago", msg.Ruta},
 		}
 		sendMsg1, err := funScreen(screen1)
 		if err != nil {
@@ -41,12 +42,22 @@ func (a *Actor) Receive(ctx actor.Context) {
 			break
 		}
 		pubsub.Publish(topicGraph, sendMsg1)
+
 		time.Sleep(100 * time.Millisecond)
+		count1 := new(Countinputs)
+		count1.Count = a.inputs
+		sendMsg3, err := funCounts(count1)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg3)
+		time.Sleep(100 * time.Millisecond)
+	case *MsgRef:
+		// time.Sleep(100 * time.Millisecond)
 		ref1 := new(ReferenceApp)
-		ref1.Appversion = "V: "
-		ref1.Refproduct = "OMV-Z7-1431"
-		ref1.Appversion = fmt.Sprintf("%s%.02f", "V: ", 1.0)
-		// ref1.Count = a.inputs
+		ref1.Refproduct = msg.Device
+		ref1.Appversion = fmt.Sprintf("V: %s", msg.Version)
 		sendMsg2, err := funRef(ref1)
 		if err != nil {
 			logs.LogWarn.Println(err)
@@ -62,7 +73,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			break
 		}
 		pubsub.Publish(topicGraph, sendMsg3)
-		time.Sleep(100 * time.Millisecond)
+
 	case *MsgValidationTag:
 		screen2 := &Screen{
 			ID:  2,
@@ -102,6 +113,17 @@ func (a *Actor) Receive(ctx actor.Context) {
 			Msg: msg.Value,
 		}
 		sendMsg, err := funScreen(screen3)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg)
+	case *MsgOk:
+		screen2 := &Screen{
+			ID:  2,
+			Msg: msg.Value,
+		}
+		sendMsg, err := funScreen(screen2)
 		if err != nil {
 			logs.LogWarn.Println(err)
 			break

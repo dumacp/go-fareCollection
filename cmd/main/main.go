@@ -27,6 +27,10 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	version = "1.0.0"
+)
+
 var verbose int
 var logstd bool
 var id string
@@ -107,7 +111,7 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
-	appActor := app.NewActor(id)
+	appActor := app.NewActor(id, version)
 	propsApp := actor.PropsFromFunc(appActor.Receive)
 
 	pidApp, err := ctx.SpawnNamed(propsApp, "app-actor")
