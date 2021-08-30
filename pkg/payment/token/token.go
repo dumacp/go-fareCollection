@@ -1,16 +1,24 @@
 package token
 
-import "github.com/dumacp/go-fareCollection/pkg/payment"
+import (
+	"time"
+
+	"github.com/dumacp/go-fareCollection/pkg/payment"
+)
 
 type token struct {
 	id            string
 	ttype         string
 	pin           int
 	pid           uint
+	fid           uint
+	exp           time.Time
 	coord         string
 	data          map[string]interface{}
 	rawDataBefore interface{}
 	rawDataAfter  interface{}
+	historical    []payment.Historical
+	err           string
 }
 
 func (t *token) Type() string {
@@ -29,37 +37,32 @@ func (t *token) PID() uint {
 	return t.pid
 }
 
-func (t *token) Historical() []payment.Historical {
-	panic("not implemented") // TODO: Implement
-}
-
 func (t *token) ProfileID() uint {
-	panic("not implemented") // TODO: Implement
+	return 0
 }
 
 func (t *token) PMR() bool {
-	panic("not implemented") // TODO: Implement
+	return false
 }
 
 func (t *token) AC() uint {
-	panic("not implemented") // TODO: Implement
+	return 0
 }
 
 func (t *token) Recharged() []payment.HistoricalRecharge {
-	panic("not implemented") // TODO: Implement
+	return nil
 }
 
 func (t *token) Consecutive() uint {
-	panic("not implemented") // TODO: Implement
+	return 0
 }
 
 func (t *token) VersionLayout() uint {
-	// panic("not implemented") // TODO: Implement
 	return 0
 }
 
 func (t *token) Lock() bool {
-	panic("not implemented") // TODO: Implement
+	return false
 }
 
 func (t *token) Data() map[string]interface{} {
@@ -71,20 +74,16 @@ func (t *token) Updates() map[string]interface{} {
 }
 
 func (t *token) AddRecharge(value int, deviceID uint, typeT uint, consecutive uint) error {
-	panic("not implemented") // TODO: Implement
+	return nil
 }
 
 func (t *token) AddBalance(value int) error {
-	panic("not implemented") // TODO: Implement
+	return nil
 }
 
-func (t *token) SetProfile(_ uint) {
-	panic("not implemented") // TODO: Implement
-}
+func (t *token) SetProfile(_ uint) {}
 
-func (t *token) SetLock() {
-	panic("not implemented") // TODO: Implement
-}
+func (t *token) SetLock() {}
 
 func (t *token) SetCoord(data string) {
 	t.coord = data
@@ -95,9 +94,9 @@ func (t *token) Coord() string {
 }
 
 func (t *token) SetError(err string) {
-	panic("not implemented") // TODO: Implement
+	t.err = err
 }
 
 func (t *token) Error() string {
-	panic("not implemented") // TODO: Implement
+	return t.err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/lists"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
+	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 	"github.com/dumacp/go-fareCollection/pkg/payment/mplus"
@@ -16,20 +17,7 @@ import (
 	"github.com/dumacp/go-logs/pkg/logs"
 )
 
-const (
-	paymT1 = iota
-	paymT2
-)
-
 func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
-	paymType := 0
-	switch msg.GetType() {
-	case "MIFARE_PLUS_EV2_4K":
-		paymType = paymT1
-	case "ENDUSER_QR":
-		paymType = paymT2
-	}
-
 	/**
 	jsonprint, err := json.MarshalIndent(msg.Data, "", "  ")
 	if err != nil {
@@ -59,19 +47,20 @@ func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
 	logs.LogBuild.Printf("tag map: %v", mcard)
 	// v, err := payment.ValidationTag(lastMcard, 1028, 1290)
 
-	switch paymType {
-	case paymT1:
+	raw := msg.GetRaw()
+
+	switch msg.GetType() {
+	case "MIFARE_PLUS_EV2_4K":
 		paym = mplus.ParseToPayment(msg.Uid, msg.GetType(), mcard)
-	case paymT2:
-		paym = token.ParseToPayment(msg.Uid, mcard)
+		raw["mv"] = "3"
+	case qr.EQPM:
+		paym = token.ParseToPayment(msg.Uid, msg.GetType(), mcard)
+		raw["mv"] = fmt.Sprintf("%d", paym.VersionLayout())
+	case qr.AQPM:
+		paym = token.ParseToPayment(msg.Uid, msg.GetType(), mcard)
+		raw["mv"] = fmt.Sprintf("%d", paym.VersionLayout())
 	}
 
-	raw := msg.GetRaw()
-	raw["mv"] = fmt.Sprintf("%d", paym.VersionLayout())
-	switch paymType {
-	case paymT1:
-		raw["mv"] = "3"
-	}
 	paym.SetRawDataBefore(raw)
 	return paym, nil
 
@@ -163,18 +152,33 @@ func CalcUpdatesWithFare(ctx actor.Context, pidFare *actor.PID, deviceID int,
 }
 
 func CalcUpdatesQR(
-	paym payment.Payment, oldRand, newRand *int) (map[string]interface{}, error) {
+	paym payment.Payment, itineraryID uint, oldRand, newRand *int) (map[string]interface{}, error) {
 	switch paym.Type() {
-	case "ENDUSER_QR":
+	case qr.EQPM:
 		if pin, err := paym.ApplyFare([]int{*newRand, *oldRand}); err != nil {
 			return nil, err
 		} else {
+			lasth := paym.Historical()
+			if len(lasth) > 0 {
+				lasth[len(lasth)-1].SetItineraryID(itineraryID)
+			}
 			for _, v := range []*int{newRand, oldRand} {
 				if *v == pin {
 					*v = -1
 				}
 			}
 		}
+		return nil, nil
+	}
+	return nil, errors.New("error QR")
+}
+func CalcUpdatesAnonQR(paym payment.Payment, itineraryID uint) (map[string]interface{}, error) {
+	if _, err := paym.ApplyFare(nil); err != nil {
+		return nil, err
+	}
+	lasth := paym.Historical()
+	if len(lasth) > 0 {
+		lasth[len(lasth)-1].SetItineraryID(itineraryID)
 	}
 	return nil, nil
 }

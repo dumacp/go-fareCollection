@@ -15,6 +15,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/gps"
 	"github.com/dumacp/go-fareCollection/internal/graph"
 	"github.com/dumacp/go-fareCollection/internal/lists"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/picto"
 	"github.com/dumacp/go-fareCollection/internal/qr"
@@ -144,6 +145,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		a.fmachine.Event(eOk, []string{"configuración", "datos actualizados"})
 	case *parameters.MsgParameters:
+		logstrans.LogInfo.Printf("params: %+v", msg.Data)
 		if ctx.Sender() != nil {
 			a.pidParams = ctx.Sender()
 		}
@@ -185,6 +187,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.listRestrictive = make(map[string]string)
 		}
 		a.listRestrictive[msg.ID] = msg.PaymentMediumType
+		logstrans.LogInfo.Printf("watch over lists: %+v", a.listRestrictive)
 	case *messages.RegisterFareActor:
 		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.RegisterListActor:
@@ -229,7 +232,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(a.pidUso, uso)
 		}
 	case *usostransporte.UsoTransporte:
-		logs.LogBuild.Printf("nodeID: [% X]", uuid.NodeID())
+		// logs.LogBuild.Printf("nodeID: [% X]", uuid.NodeID())
 		if len(msg.Coord) <= 0 {
 			coord := ""
 			if a.pidGps != nil {
@@ -265,21 +268,20 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.recharge.Seq = a.seq + 1
 		a.recharge.DeviceID = a.deviceIDnum
 	case *messages.MsgPayment:
-		/**/
-
 		updates, err := func() (map[string]interface{}, error) {
-			logs.LogInfo.Printf("detect uid: %d", msg.Uid)
+			logstrans.LogBuild.Printf("detect uid: %d", msg.Uid)
 			paym, err := business.ParsePayment(msg)
-			logs.LogInfo.Printf("parse uid: %d", msg.Uid)
+			logstrans.LogBuild.Printf("parse uid: %d", msg.Uid)
 			if err != nil {
 				return nil, err
 			}
 			ok, err := business.VerifyListRestrictive(ctx, a.pidList, paym.Type(), int64(paym.PID()), a.listRestrictive)
 			if err != nil {
-				logs.LogWarn.Println(err)
+				logstrans.LogWarn.Printf("restrictive list err: %s", err)
 			}
 
 			if ok {
+				logstrans.LogWarn.Printf("tag in restrictive list: %s, %d", paym.Type(), paym.PID())
 				return nil, NewErrorScreen("tarjeta bloqueada", "tarjeta en listas restrictivas")
 			}
 
@@ -289,26 +291,30 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 			switch paym.Type() {
 			case "MIFARE_PLUS_EV2_4K":
-				logs.LogInfo.Printf("rewrite try, uid: %d, last: %d", msg.Uid, a.lastWriteError)
+				// logstrans.LogInfo.Printf("rewrite try, uid: %d, last: %d", msg.Uid, a.lastWriteError)
 				lastPaym := a.paym[msg.GetUid()]
 				if business.Rewrite(paym, lastPaym, a.lastWriteError) {
-					logs.LogInfo.Printf("rewrite try, uid: %d", msg.Uid)
-					logs.LogInfo.Printf("payment last (%d) updates: %+v", lastPaym.PID(), lastPaym.Updates())
+					logstrans.LogInfo.Printf("rewrite try, uid: %d", msg.Uid)
+					logstrans.LogBuild.Printf("payment last (%d) updates: %+v", lastPaym.PID(), lastPaym.Updates())
 					a.paym[msg.GetUid()] = lastPaym
 					return lastPaym.Updates(), nil
 				}
-				logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
+				// logstrans.LogBuild.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
 				a.paym[msg.GetUid()] = paym
 				if lastPaym != nil && paym.MID() != lastPaym.MID() {
 					lasth := lastPaym.Historical()
 
 					tt := int64(0)
+					iti := uint(0)
 					if len(lasth) > 0 {
 						tt = lasth[len(lasth)-1].TimeTransaction().UnixNano() / 1_000_000
+						iti = lasth[len(lasth)-1].ItineraryID()
+
 					}
 					uso := &usostransporte.UsoTransporte{
 						ID:                    lastPaym.ID(),
 						DeviceID:              a.deviceID,
+						ItineraryID:           int(iti),
 						PaymentMediumTypeCode: msg.Type,
 						PaymentMediumId:       fmt.Sprintf("%d", lastPaym.PID()),
 						MediumID:              fmt.Sprintf("%d", lastPaym.MID()),
@@ -342,22 +348,37 @@ func (a *Actor) Receive(ctx actor.Context) {
 					}
 				}
 				return updates, nil
-			case "ENDUSER_QR":
-				logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
+			case qr.EQPM:
 				a.paym[msg.GetUid()] = paym
-				return business.CalcUpdatesQR(paym, &a.oldRand, &a.newRand)
+				itiID := uint(0)
+				if a.params != nil {
+					itiID = uint(a.params.PaymentItinerary)
+				}
+				if _, err := business.CalcUpdatesQR(paym, itiID, &a.oldRand, &a.newRand); err != nil {
+					return nil, NewErrorScreen("ticket no válido", err.Error())
+				}
+				return nil, nil
+			case qr.AQPM:
+				a.paym[msg.GetUid()] = paym
+				itiID := uint(0)
+				if a.params != nil {
+					itiID = uint(a.params.PaymentItinerary)
+				}
+				if _, err := business.CalcUpdatesAnonQR(paym, itiID); err != nil {
+					return nil, NewErrorScreen("ticket no válido", err.Error())
+				}
+				return nil, nil
 			default:
-				logs.LogInfo.Printf("payment (%d) updates: %+v", paym.PID(), paym.Updates())
 				a.paym[msg.GetUid()] = paym
 				return nil, fmt.Errorf("payment type not found: %s, %s", msg.Type, paym.Type())
 			}
 		}()
 		if err != nil {
-			if a.paym != nil {
+			if len(a.paym) > 0 {
 				delete(a.paym, msg.GetUid())
 			}
 			a.fmachine.Event(eError, err)
-			logs.LogError.Println(err)
+			logstrans.LogError.Printf("payment err: %s", err)
 			break
 		}
 
@@ -365,7 +386,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 		if ctx.Sender() != nil {
 			sendMsg := &messages.MsgWritePayment{
-				Uid:     msg.Uid,
+				Uid:     msg.GetUid(),
 				Type:    msg.GetType(),
 				Updates: updateValues,
 				Seq:     int32(a.seq + 1),
@@ -376,7 +397,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Request(ctx.Sender(), sendMsg)
 		}
 		a.lastWriteError = 0
-		/**/
 	case *messages.MsgWritePaymentError:
 		a.lastWriteError = msg.GetUid()
 		if a.paym == nil {
@@ -398,20 +418,20 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if a.pidGps != nil {
 			res, err := ctx.RequestFuture(a.pidGps, &gps.MsgGetGps{}, 10*time.Millisecond).Result()
 			if err != nil {
-				logs.LogWarn.Printf("get fare err: %s", err)
+				logstrans.LogWarn.Printf("get fare err: %s", err)
 			} else {
 				switch v := res.(type) {
 				case *gps.MsgGPS:
 					if v.Data != nil {
 						coord = string(v.Data)
-						logs.LogBuild.Printf("coord: %s", coord)
+						logstrans.LogBuild.Printf("coord: %s", coord)
 					}
 				}
 			}
 		}
 		lastPaym.SetCoord(coord)
 		a.fmachine.Event(eError, NewErrorScreen("error de escritura", "vuelva a ubicar la tarjeta"))
-		logs.LogError.Printf("error de escritura, uid: %d, err: %s", msg.Uid, msg.Error)
+		logstrans.LogError.Printf("write tag error: uid: %X, id: %d, err: %s", msg.Uid, lastPaym.PID(), msg.Error)
 	case *messages.MsgWritePaymentResponse:
 		if a.paym == nil {
 			a.paym = make(map[uint64]payment.Payment)
@@ -423,17 +443,20 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.inputs++
 		a.seq++
 
-		logs.LogInfo.Printf("payment write map: %+v, updates: %+v", lastPaym.Data(), lastPaym.Updates())
 		// ctx.Send(a.pidGraph, &graph.MsgValidationTag{Value: fmt.Sprintf("$%.02f", float32(a.mcard["newSaldo"].(int32)))})
-		a.fmachine.Event(eCardValidated, lastPaym.Balance())
+		// a.fmachine.Event(eCardValidated, lastPaym.Balance())
 
 		cardid := lastPaym.PID()
 		uid := msg.Uid
 
 		lasth := lastPaym.Historical()
+		// logs.LogBuild.Printf("lasth: %+v", lasth)
 		tt := int64(0)
+		iti := uint(0)
 		if len(lasth) > 0 {
+			// logs.LogInfo.Printf("lasth: %+v", lasth[len(lasth)-1])
 			tt = lasth[len(lasth)-1].TimeTransaction().UnixNano() / 1_000_000
+			iti = lasth[len(lasth)-1].ItineraryID()
 		}
 
 		raw := msg.GetRaw()
@@ -441,12 +464,17 @@ func (a *Actor) Receive(ctx actor.Context) {
 		switch msg.GetType() {
 		case "MIFARE_PLUS_EV2_4K":
 			raw["mv"] = "3"
+			a.fmachine.Event(eCardValidated, lastPaym.Balance())
+		default:
+			// tt = time.Now().UnixNano() / 1_000_000
+			a.fmachine.Event(eQRValidated, lastPaym.Balance())
 		}
 		lastPaym.SetRawDataAfter(raw)
 
 		uso := &usostransporte.UsoTransporte{
 			ID:                     lastPaym.ID(),
 			DeviceID:               a.deviceID,
+			ItineraryID:            int(iti),
 			SamUuid:                msg.Samuid,
 			PaymentMediumTypeCode:  msg.Type,
 			PaymentMediumId:        fmt.Sprintf("%d", cardid),
@@ -473,7 +501,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 			if len(hr) > 0 && hr[len(hr)-1].ConsecutiveID() == uint(msg.GetSeq()) &&
 				hr[len(hr)-1].DeviceID() == uint(a.deviceIDnum) {
-				logs.LogInfo.Printf("payment recharged: %+v", hr[len(hr)-1])
+				logstrans.LogInfo.Printf("payment recharged: %+v", hr[len(hr)-1])
 				uso.TransactionType = "TFC_WITH_BALANCE_RECHARGE"
 				// uso.RechargeTokenId = int(a.recharge.TID)
 				// uso.RechargeValue = a.recharge.Value
@@ -488,7 +516,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		ctx.Send(ctx.Self(), uso)
 		a.lastWriteError = 0
-		delete(a.paym, msg.GetUid())
+		if len(a.paym) > 0 {
+			delete(a.paym, msg.GetUid())
+		}
 	case *qr.MsgNewCodeQR:
 		if err := func() error {
 			divInput := msg.Value[0:4]
@@ -508,10 +538,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 				//TODO: How to get ?
 				KeySlot: 0x33,
 			}
-			logs.LogBuild.Printf("QR crypt: [% X], len: %d; [% X], len: %d",
-				mdec.Data, len(mdec.Data), mdec.DevInput, len(mdec.DevInput))
+			// logs.LogBuild.Printf("QR crypt: [% X], len: %d; [% X], len: %d",
+			// 	mdec.Data, len(mdec.Data), mdec.DevInput, len(mdec.DevInput))
 
 			var data []byte
+			samuid := ""
 
 			res, err := ctx.RequestFuture(a.pidSam, mdec, time.Millisecond*600).Result()
 			if err != nil {
@@ -523,17 +554,19 @@ func (a *Actor) Receive(ctx actor.Context) {
 					return errors.New("QR decrypt data is empty")
 				}
 				data = v.Plain
+				samuid = v.SamUID
 				logs.LogBuild.Printf("QR decrypt: %s, [%X]", data, data)
 			}
 
 			if ctx.Sender() != nil {
 				ctx.Respond(&qr.MsgResponseCodeQR{
-					Value: data,
+					Value:  data,
+					SamUid: samuid,
 				})
 			}
 			return nil
 		}(); err != nil {
-			logs.LogError.Printf("QR error: %s", err)
+			logstrans.LogError.Printf("QR error: %s", err)
 		}
 	case *qr.MsgNewRand:
 		a.oldRand = a.newRand

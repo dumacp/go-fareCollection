@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
+func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payment.Payment {
 	cid := make(chan string)
 	go func() {
 		defer close(cid)
@@ -20,13 +20,18 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 		}
 	}()
 	t := &token{}
-	t.ttype = "ENDUSER_QR"
+	t.ttype = ttype
 	t.data = mapa
+	t.historical = make([]payment.Historical, 0)
 	for k, value := range mapa {
 		switch k {
 		case "pid":
 			switch v := value.(type) {
 			case int:
+				t.pid = uint(v)
+			case uint:
+				t.pid = uint(v)
+			case int64:
 				t.pid = uint(v)
 			case string:
 				varsplit := strings.Split(v, "-")
@@ -35,6 +40,27 @@ func ParseToPayment(uid uint64, mapa map[string]interface{}) payment.Payment {
 					t.pid = uint(num)
 				}
 			}
+		case "fid":
+			switch v := value.(type) {
+			case int:
+				t.fid = uint(v)
+			case uint:
+				t.fid = uint(v)
+			case int64:
+				t.fid = uint(v)
+			}
+		case "exp":
+			exp := int64(0)
+			switch v := value.(type) {
+			case int:
+				exp = int64(v)
+			case uint:
+				exp = int64(v)
+			case int64:
+				exp = int64(v)
+			default:
+			}
+			t.exp = time.Unix(exp, 0)
 		case "pin":
 			v, _ := value.(string)
 			t.pin, _ = strconv.Atoi(v)

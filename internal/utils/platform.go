@@ -10,6 +10,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 var (
@@ -39,6 +41,8 @@ func Post(client *http.Client,
 		client.Timeout = 30 * time.Second
 	}
 
+	logs.LogBuild.Printf("Post request: %+v", req)
+
 	var resp *http.Response
 	rangex := make([]int, 3)
 	for range rangex {
@@ -49,17 +53,17 @@ func Post(client *http.Client,
 		}
 		break
 	}
-	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("StatusCode: %d, response: %s", resp.StatusCode, body)
+		return nil, fmt.Errorf("StatusCode: %d, resp: %s, req: %s", resp.StatusCode, body, req.URL)
 	}
 	return ioutil.ReadAll(resp.Body)
 }
@@ -79,6 +83,7 @@ func Get(client *http.Client,
 		client.Timeout = 30 * time.Second
 	}
 
+	logs.LogBuild.Printf("Get request: %+v", req)
 	var resp *http.Response
 	rangex := make([]int, 3)
 	for range rangex {
@@ -89,17 +94,17 @@ func Get(client *http.Client,
 		}
 		break
 	}
-	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("StatusCode: %d, response: %s", resp.StatusCode, body)
+		return nil, fmt.Errorf("StatusCode: %d, resp: %s, req: %s", resp.StatusCode, body, req.URL)
 	}
 	return ioutil.ReadAll(resp.Body)
 }

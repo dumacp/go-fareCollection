@@ -36,6 +36,8 @@ var logstd bool
 var id string
 var serial string
 var baud int
+var dirlogs string
+var prefixlogs string
 
 func init() {
 	flag.IntVar(&verbose, "verbose", 0, "level log\n\t0: Error\n\t1: Warning\n\t2: Info\n\t3: Debug")
@@ -43,11 +45,14 @@ func init() {
 	flag.StringVar(&id, "id", "OMZV7-0001", "device ID")
 	flag.StringVar(&serial, "serial", "/dev/ttymxc4", "device path")
 	flag.IntVar(&baud, "baud", 460800, "device baud speed")
+	flag.StringVar(&dirlogs, "dirlogs", "/SD/logs/", "dir path to logs")
+	flag.StringVar(&prefixlogs, "prefixlogs", "log", "prefix to filename")
 }
 
 func main() {
 	flag.Parse()
 	initLogs(verbose, logstd)
+	initLogsTransactional(dirlogs, prefixlogs, verbose, logstd)
 
 	logs.LogBuild.Println("debug log")
 

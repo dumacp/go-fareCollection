@@ -4,7 +4,8 @@ type MsgNewCodeQR struct {
 	Value []byte
 }
 type MsgResponseCodeQR struct {
-	Value []byte
+	Value  []byte
+	SamUid string
 }
 
 type MsgNewRand struct {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/internal/database"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
@@ -70,7 +71,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if err != nil {
 				return fmt.Errorf("send uso err: %w", err)
 			}
-			logs.LogInfo.Printf("USO: %s", data)
+			logstrans.LogInfo.Printf("uso de transporte: %s", data)
 			if resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, data); err != nil {
 				if a.db != nil {
 					ctx.Send(a.db, &database.MsgUpdateData{

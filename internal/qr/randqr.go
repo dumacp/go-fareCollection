@@ -14,7 +14,7 @@ import (
 // 	// timeout = 30
 // )
 
-var ErrorCipher = errors.New("Error in CIPHER")
+var ErrorCipher = errors.New("error in CIPHER")
 
 type QrCode struct {
 	Route         string `json:"r"`

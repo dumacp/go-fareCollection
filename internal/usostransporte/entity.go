@@ -3,6 +3,7 @@ package usostransporte
 type UsoTransporte struct {
 	ID                     string      `json:"transactionId"`
 	DeviceID               string      `json:"deviceId"`
+	ItineraryID            int         `json:"itineraryId"`
 	PaymentMediumTypeCode  string      `json:"paymentMediumTypeCode"`
 	TerminalTransactionSeq int         `json:"terminalTransactionSeq"`
 	PaymentMediumId        string      `json:"paymentMediumId"`

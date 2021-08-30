@@ -1,4 +1,4 @@
-package logs
+package logstrans
 
 import (
 	"io/ioutil"
@@ -7,25 +7,29 @@ import (
 )
 
 //LogError log error
-var LogError = New("[ ERROR ] ", 3)
+var LogError = New("error", 3)
 
 //LogWarn log Warning
-var LogWarn = New("[ WARN ] ", 4)
+var LogWarn = New("warning", 4)
 
 //LogInfo log Info
-var LogInfo = New("[ INFO ] ", 6)
+var LogInfo = New("information", 6)
 
 //LogBuild log Debug
-var LogBuild = New("[ BUILD ] ", 7)
+var LogBuild = New("debug", 7)
 
 //Logger struct to logger
 type Logger struct {
 	*log.Logger
+	Type string
 }
 
 //New create Logger
-func New(prefix string, flag int) *Logger {
-	return &Logger{log.New(os.Stderr, prefix, flag)}
+func New(ttype string, flag int) *Logger {
+	return &Logger{
+		Logger: log.New(os.Stderr, "", flag),
+		Type:   ttype,
+	}
 }
 
 //SetLogError set logs with ERROR level

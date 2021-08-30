@@ -139,7 +139,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				count := 30
 				numPages := 1000
 				for i := range make([]int, numPages) {
-					filter := fmt.Sprintf(filterHttpQuery, count, i)
+					filter := fmt.Sprintf(filterHttpQuery, i, count)
 					url := fmt.Sprintf("%s%s", a.urlRoute, filter)
 					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
 					if err != nil {
@@ -173,7 +173,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				numPages := 1000
 				actives := make(map[int]int)
 				for i := range make([]int, numPages) {
-					filter := fmt.Sprintf(filterHttpQuery, count, i)
+					filter := fmt.Sprintf(filterHttpQuery, i, count)
 					url := fmt.Sprintf("%s%s", a.urlItinerary, filter)
 					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp, nil)
 					if err != nil {

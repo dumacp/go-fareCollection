@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/dumacp/go-fareCollection/internal/buzzer"
@@ -86,7 +87,10 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			a.inputs++
 			value := ""
 			if e.Args != nil && len(e.Args) > 0 {
-				if v, ok := e.Args[0].(string); ok {
+				switch v := e.Args[0].(type) {
+				case int:
+					value = strconv.Itoa(v)
+				case string:
 					value = v
 				}
 			}

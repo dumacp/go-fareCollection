@@ -80,7 +80,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				actives := make(map[int]int)
 				for i := range make([]int, numPages) {
 					// dataToPagination := fmt.Sprintf(paginationInput, count, i)
-					filter := fmt.Sprintf(filterHttpQuery, count, i, true)
+					filter := fmt.Sprintf(filterHttpQuery, i, count, true)
 					url := fmt.Sprintf("%s%s", a.url, filter)
 					resp, err := utils.Get(a.httpClient, url, a.userHttp, a.passHttp,
 						nil)
@@ -121,7 +121,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 						}
 
 					}
-					if result.QueryTotalResultCount < count {
+					if len(result.Listing) < count {
 						break
 					}
 				}

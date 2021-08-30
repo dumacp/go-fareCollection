@@ -19,6 +19,7 @@ import (
 type Actor struct {
 	fmachine *fsm.FSM
 	ctx      actor.Context
+	samuid   string
 	chRand   chan int
 	quit     chan int
 }
@@ -32,6 +33,8 @@ func NewActor() actor.Actor {
 
 func (a *Actor) Receive(ctx actor.Context) {
 	a.ctx = ctx
+	logs.LogBuild.Printf("Message arrived in qrActor: %s, %T, %s",
+		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 		a.fmachine.Event(eOpened)
@@ -49,19 +52,25 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(ctx.Parent(), msg)
 		}
 	case *messages.MsgWritePayment:
-		select {
-		case a.chRand <- 1:
-		case <-time.After(100 * time.Millisecond):
+		switch msg.Type {
+		case "ENDUSER_QR":
+			select {
+			case a.chRand <- 1:
+			case <-time.After(100 * time.Millisecond):
+			}
 		}
 		if ctx.Sender() != nil {
 			ctx.Send(ctx.Parent(), &messages.MsgWritePaymentResponse{
-				Uid:  msg.Uid,
-				Type: msg.Type,
-				Raw:  make(map[string]string),
+				Uid:    msg.Uid,
+				Type:   msg.Type,
+				Raw:    make(map[string]string),
+				Samuid: a.samuid,
+				Seq:    msg.GetSeq(),
 			})
 		}
 	case *MsgResponseCodeQR:
 		if err := func() error {
+			a.samuid = msg.SamUid
 			data := msg.Value
 			mess := struct {
 				Type  string          `json:"t"`
@@ -104,46 +113,60 @@ func (a *Actor) Receive(ctx actor.Context) {
 				if ctx.Parent() != nil {
 					ctx.Send(ctx.Parent(), sendMsg)
 				}
-			case "EQPM":
-				var mapp map[string]interface{}
-				if err := json.Unmarshal(mess.Value, &mapp); err != nil {
+			case EQPM:
+				raw, data, err := paym(mess.Value)
+				if err != nil {
 					return fmt.Errorf("QR error: %w", err)
 				}
-				raw := make(map[string]string)
-				data := make(map[string]*messages.Value)
-				for k, v := range mapp {
-					switch value := v.(type) {
-					case float64:
-						raw[k] = fmt.Sprintf("%d", int32(value))
-						data[k] = &messages.Value{Data: &messages.Value_IntValue{IntValue: int32(value)}}
-					case int:
-						raw[k] = fmt.Sprintf("%d", value)
-						data[k] = &messages.Value{Data: &messages.Value_IntValue{IntValue: int32(value)}}
-					case uint:
-						raw[k] = fmt.Sprintf("%d", value)
-						data[k] = &messages.Value{Data: &messages.Value_UintValue{UintValue: uint32(value)}}
-					case int64:
-						raw[k] = fmt.Sprintf("%d", value)
-						data[k] = &messages.Value{Data: &messages.Value_Int64Value{Int64Value: int64(value)}}
-					case uint64:
-						raw[k] = fmt.Sprintf("%d", value)
-						data[k] = &messages.Value{Data: &messages.Value_Uint64Value{Uint64Value: uint64(value)}}
-					case string:
-						raw[k] = value
-						data[k] = &messages.Value{Data: &messages.Value_StringValue{StringValue: value}}
-					case []byte:
-						raw[k] = fmt.Sprintf("%s", value)
-						data[k] = &messages.Value{Data: &messages.Value_BytesValue{BytesValue: value}}
+				uid := uint64(0)
+				if v, ok := data["pid"]; ok {
+					switch {
+					case v.GetIntValue() > 0:
+						uid = uint64(v.GetIntValue())
+					case v.GetInt64Value() > int64(0):
+						uid = uint64(v.GetInt64Value())
+					case len(v.GetStringValue()) > 0:
+						vv, _ := strconv.Atoi(v.GetStringValue())
+						uid = uint64(vv)
 					}
+				} else {
+					uid = uint64(time.Now().UnixNano() / 1_000_0000)
 				}
 				if ctx.Parent() != nil {
 					ctx.Request(ctx.Parent(), &messages.MsgPayment{
-						Type: "ENDUSER_QR",
+						Type: EQPM,
 						Data: data,
 						Raw:  raw,
+						Uid:  uid,
 					})
 				}
-
+			case AQPM:
+				raw, data, err := paym(mess.Value)
+				if err != nil {
+					return fmt.Errorf("QR error: %w", err)
+				}
+				uid := uint64(0)
+				if v, ok := data["pid"]; ok {
+					switch {
+					case v.GetIntValue() > 0:
+						uid = uint64(v.GetIntValue())
+					case v.GetInt64Value() > int64(0):
+						uid = uint64(v.GetInt64Value())
+					case len(v.GetStringValue()) > 0:
+						vv, _ := strconv.Atoi(v.GetStringValue())
+						uid = uint64(vv)
+					}
+				} else {
+					uid = uint64(time.Now().UnixNano() / 1_000_0000)
+				}
+				if ctx.Parent() != nil {
+					ctx.Request(ctx.Parent(), &messages.MsgPayment{
+						Type: AQPM,
+						Data: data,
+						Raw:  raw,
+						Uid:  uid,
+					})
+				}
 			}
 			return nil
 		}(); err != nil {
