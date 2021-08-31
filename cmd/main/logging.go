@@ -100,4 +100,6 @@ func initLogsTransactional(dir, prefixFile string, verbose int, logStd bool) {
 	newLogHtml(logstrans.LogInfo, dir, prefixFile)
 	newLogHtml(logstrans.LogBuild, dir, prefixFile)
 	newLogHtml(logstrans.LogError, dir, prefixFile)
+	newLogHtml(logstrans.LogTransInfo, dir, fmt.Sprintf("trans-%s", prefixFile))
+	newLogHtml(logstrans.LogTransWarn, dir, fmt.Sprintf("trans-%s", prefixFile))
 }
