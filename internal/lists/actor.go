@@ -107,9 +107,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 			defer func() {
 				if ctx.Sender() != nil {
 					if v, ok := a.listMap[msg.ID]; ok {
-						ctx.Respond(&MsgWatchListResponse{
+						ctx.Respond(&WatchList{
 							ID:                msg.ID,
 							PaymentMediumType: v.PaymentMediumCode.Code,
+							Version:           v.Version,
 						})
 					}
 				}
@@ -246,7 +247,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				ctx.Send(a.db, &database.MsgUpdateData{
 					Database:   databaseName,
 					Collection: collectionNameData,
-					ID:         list.ID,
+					ID:         list.Code,
 					Data:       resp,
 				})
 			}

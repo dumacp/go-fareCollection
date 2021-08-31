@@ -7,16 +7,22 @@ import (
 )
 
 //LogError log error
-var LogError = New("error", 3)
+var LogError = New("error", log.Ldate|log.Ltime)
 
 //LogWarn log Warning
-var LogWarn = New("warning", 4)
+var LogWarn = New("warning", log.Ldate|log.Ltime)
 
 //LogInfo log Info
-var LogInfo = New("information", 6)
+var LogInfo = New("information", log.Ldate|log.Ltime)
 
 //LogBuild log Debug
-var LogBuild = New("debug", 7)
+var LogBuild = New("debug", log.Ldate|log.Ltime)
+
+//logTransaction log transaction
+var LogTransInfo = New("information", log.Ldate|log.Ltime)
+
+//logTransaction log transaction
+var LogTransWarn = New("warning", log.Ldate|log.Ltime)
 
 //Logger struct to logger
 type Logger struct {

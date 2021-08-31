@@ -50,6 +50,9 @@ type Payment interface {
 	Consecutive() uint
 	VersionLayout() uint
 	Lock() bool
+	LockReason() string
+	LockList() string
+	LockListVersion() float32
 	Data() map[string]interface{}
 	Updates() map[string]interface{}
 	RawDataBefore() interface{}
@@ -67,5 +70,5 @@ type Payment interface {
 	SetError(err string)
 	SetCoord(data string)
 	Error() string
-	SetLock()
+	SetLock(reason, listCode string, listVersion float32)
 }

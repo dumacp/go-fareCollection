@@ -3,7 +3,6 @@ package database
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/dumacp/go-logs/pkg/logs"
@@ -135,7 +134,7 @@ type QueryType struct {
 
 func QueryData(data chan *QueryType, stop chan int, database, collection string, prefixID []byte, reverse bool) func(*bbolt.Tx) error {
 	return func(tx *bbolt.Tx) error {
-		log.Printf("database: %s, collection: %s, prefix: %s", database, collection, prefixID)
+		// log.Printf("database: %s, collection: %s, prefix: %s", database, collection, prefixID)
 		defer close(data)
 		bkdb := tx.Bucket([]byte(database))
 		if bkdb == nil {

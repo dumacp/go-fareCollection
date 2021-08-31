@@ -145,7 +145,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			if ctx.Sender() != nil {
 				ctx.Respond(&MsgAckPersistData{ID: id})
 			}
-			logs.LogBuild.Printf("STEP 6_00000: %s", ctx.Sender())
+			// logs.LogBuild.Printf("STEP 6_00000: %s", ctx.Sender())
 			return nil
 		}(); err != nil {
 			logs.LogError.Println(err)
@@ -173,14 +173,14 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 				id = msg.ID
 			}
 
-			logs.LogBuild.Printf("STEP 6_0000: %s", ctx.Sender())
+			// logs.LogBuild.Printf("STEP 6_0000: %s", ctx.Sender())
 			if err := a.db.Update(PersistData(id, msg.Data, msg.Database, msg.Collection, true)); err != nil {
 				return err
 			}
 			if ctx.Sender() != nil {
 				ctx.Respond(&MsgAckPersistData{ID: id})
 			}
-			logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
+			// logs.LogBuild.Printf("STEP 6_1111: %s", ctx.Sender())
 			//TODO:
 			//time.Sleep(1 * time.Second)
 			return nil
@@ -255,10 +255,10 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 			go func(ctx actor.Context, pid *actor.PID) {
 				defer func() {
 					select {
-					case _, ok := <-data:
-						if !ok {
-							fmt.Println("channel data close")
-						}
+					case <-data:
+						// if !ok {
+						// 	fmt.Println("channel data close")
+						// }
 					default:
 						close(data)
 					}

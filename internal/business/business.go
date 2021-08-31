@@ -67,9 +67,11 @@ func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
 }
 
 func VerifyListRestrictive(ctx actor.Context, pidList *actor.PID, paymType string, paymID int64,
-	listRestrictive map[string]string) (bool, error) {
-	for list, code := range listRestrictive {
-		if code != paymType {
+	listRestrictive map[string]*lists.WatchList) (bool, string, error) {
+	for list, v := range listRestrictive {
+		ttype := v.PaymentMediumType
+		code := v.ID
+		if ttype != paymType {
 			continue
 		}
 		resList, err := ctx.RequestFuture(pidList, &lists.MsgVerifyInList{
@@ -77,17 +79,17 @@ func VerifyListRestrictive(ctx actor.Context, pidList *actor.PID, paymType strin
 			ID:     []int64{paymID},
 		}, 60*time.Millisecond).Result()
 		if err != nil {
-			return false, fmt.Errorf("get restrictive list err: %w", err)
+			return false, "", fmt.Errorf("get restrictive list err: %w", err)
 
 		}
 		switch v := resList.(type) {
 		case *lists.MsgVerifyInListResponse:
 			if len(v.ID) > 0 {
-				return true, nil
+				return true, code, nil
 			}
 		}
 	}
-	return false, nil
+	return false, "", nil
 }
 
 func CalcUpdatesWithFare(ctx actor.Context, pidFare *actor.PID, deviceID int,
@@ -140,7 +142,7 @@ func CalcUpdatesWithFare(ctx actor.Context, pidFare *actor.PID, deviceID int,
 		default:
 			return nil, errors.New("fareID not found")
 		}
-		logs.LogInfo.Printf("fare calc: %+v", fareData)
+		// logs.LogInfo.Printf("fare calc: %+v", fareData)
 
 		if _, err := paym.ApplyFare(fareData); err != nil {
 			// time.Sleep(3 * time.Second)

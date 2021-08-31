@@ -7,18 +7,22 @@ import (
 )
 
 type token struct {
-	id            string
-	ttype         string
-	pin           int
-	pid           uint
-	fid           uint
-	exp           time.Time
-	coord         string
-	data          map[string]interface{}
-	rawDataBefore interface{}
-	rawDataAfter  interface{}
-	historical    []payment.Historical
-	err           string
+	id              string
+	ttype           string
+	pin             int
+	pid             uint
+	fid             uint
+	exp             time.Time
+	coord           string
+	data            map[string]interface{}
+	rawDataBefore   interface{}
+	rawDataAfter    interface{}
+	historical      []payment.Historical
+	lock            bool
+	lockReason      string
+	lockList        string
+	lockListVersion float32
+	err             string
 }
 
 func (t *token) Type() string {
@@ -62,7 +66,16 @@ func (t *token) VersionLayout() uint {
 }
 
 func (t *token) Lock() bool {
-	return false
+	return t.lock
+}
+func (t *token) LockReason() string {
+	return t.lockReason
+}
+func (t *token) LockList() string {
+	return t.lockList
+}
+func (t *token) LockListVersion() float32 {
+	return t.lockListVersion
 }
 
 func (t *token) Data() map[string]interface{} {
@@ -83,7 +96,11 @@ func (t *token) AddBalance(value int) error {
 
 func (t *token) SetProfile(_ uint) {}
 
-func (t *token) SetLock() {}
+func (t *token) SetLock(reason, listCode string, listVersion float32) {
+	t.lockReason = reason
+	t.lockList = listCode
+	t.lockListVersion = listVersion
+}
 
 func (t *token) SetCoord(data string) {
 	t.coord = data

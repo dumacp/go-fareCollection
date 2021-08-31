@@ -6,7 +6,6 @@ import (
 
 	"github.com/dumacp/go-fareCollection/internal/recharge"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
-	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 func RechargeQR(paym payment.Payment,
@@ -23,6 +22,15 @@ func RechargeQR(paym payment.Payment,
 	if data.Value <= 0 {
 		return nil, errors.New("valor invalido")
 	}
+	lasth := paym.Historical()
+
+	tt := time.Now()
+	if len(lasth) > 0 {
+		tt = lasth[len(lasth)-1].TimeTransaction()
+	}
+	if tt.Before() {
+
+	}
 
 	//TODO: where get this param
 	ttype := 2
@@ -31,7 +39,7 @@ func RechargeQR(paym payment.Payment,
 	}
 
 	if len(paym.Recharged()) > 0 {
-		logs.LogInfo.Printf("len hist re: %d", len(paym.Recharged()))
+		// logs.LogInfo.Printf("len hist re: %d", len(paym.Recharged()))
 		paym.Recharged()[len(paym.Recharged())-1].SetRechargeProp("RechargeTokenId", data.TID)
 	}
 

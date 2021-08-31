@@ -14,14 +14,16 @@ import (
 )
 
 const (
-	// defaultURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/fare-transaction"
-	defaultURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/payment-medium-transaction"
+	// transURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/fare-transaction"
+	transURL        = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/payment-medium-transaction"
+	lockUrl         = "http://192.168.188.69:3100/api/external-system-gateway/rest/payment-medium-blocked"
 	defaultUsername = "dev.nebulae"
 	// filterHttpQuery    = "?page=%d&count=%d&active=true"
-	defaultPassword    = "uno.2.tres"
-	dbpath             = "/SD/boltdb/usosdb"
-	databaseName       = "usosdb"
-	collectionNameData = "usos"
+	defaultPassword     = "uno.2.tres"
+	dbpath              = "/SD/boltdb/usosdb"
+	databaseName        = "usosdb"
+	collectionUsosData  = "usos"
+	collectionLocksData = "locks"
 )
 
 type Actor struct {
@@ -30,6 +32,7 @@ type Actor struct {
 	userHttp   string
 	passHttp   string
 	url        string
+	urlLock    string
 	// id         string
 	db *actor.PID
 }
@@ -45,7 +48,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *actor.Started:
 
 		//TODO: how get this params?
-		a.url = defaultURL
+		a.url = transURL
+		a.urlLock = lockUrl
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 
@@ -69,27 +73,64 @@ func (a *Actor) Receive(ctx actor.Context) {
 			uso := msg.Data
 			data, err := json.Marshal(uso)
 			if err != nil {
-				return fmt.Errorf("send uso err: %w", err)
+				return fmt.Errorf("parse send uso err: %w", err)
 			}
-			logstrans.LogInfo.Printf("uso de transporte: %s", data)
+			if msg.Data.Error == nil || msg.Data.Error.Code > 0 {
+				logstrans.LogTransWarn.Printf("uso transporte canceled: %s", data)
+			} else {
+				logstrans.LogTransInfo.Printf("uso transporte: %s", data)
+			}
 			if resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, data); err != nil {
 				if a.db != nil {
 					ctx.Send(a.db, &database.MsgUpdateData{
 						Database:   databaseName,
-						Collection: collectionNameData,
+						Collection: collectionUsosData,
 						ID:         uso.ID,
 						Data:       data,
 					})
 				} else {
-					return fmt.Errorf("send uso (db is empty) err post: %s, %w", resp, err)
+					return fmt.Errorf("(db is empty) err post: %s, %w", resp, err)
 				}
-				return fmt.Errorf("send uso err post: %s, %w", resp, err)
+				return fmt.Errorf("err post: %s, %w", resp, err)
 			} else {
-				logs.LogInfo.Printf("response set uso: %s", resp)
+				logstrans.LogBuild.Printf("response send uso: %s", resp)
 			}
 			return nil
 		}(); err != nil {
-			logs.LogError.Println(err)
+			logstrans.LogError.Printf("send err: transaction with ID %s (payment ID = %s), err: %s",
+				msg.Data.ID, msg.Data.PaymentMediumId, err)
+		}
+	case *MsgLock:
+		if err := func() error {
+			uso := msg.Data
+			data, err := json.Marshal(uso)
+			if err != nil {
+				return fmt.Errorf("parse send lock err: %w", err)
+			}
+			if msg.Data.Error == nil || msg.Data.Error.Code > 0 {
+				logstrans.LogTransWarn.Printf("lock canceled: %s", data)
+			} else {
+				logstrans.LogTransWarn.Printf("lock: %s", data)
+			}
+			if resp, err := utils.Post(a.httpClient, a.urlLock, a.userHttp, a.passHttp, data); err != nil {
+				if a.db != nil {
+					ctx.Send(a.db, &database.MsgUpdateData{
+						Database:   databaseName,
+						Collection: collectionLocksData,
+						ID:         uso.ID,
+						Data:       data,
+					})
+				} else {
+					return fmt.Errorf("(db is empty) err post: %s, %w", resp, err)
+				}
+				return fmt.Errorf("err post: %s, %w", resp, err)
+			} else {
+				logstrans.LogBuild.Printf("response send lock: %s", resp)
+			}
+			return nil
+		}(); err != nil {
+			logstrans.LogError.Printf("send err: transaction with ID %s (payment ID = %s), err: %s",
+				msg.Data.ID, msg.Data.PaymentMediumId, err)
 		}
 	case *MsgGetInDB:
 		if a.db == nil {
@@ -97,7 +138,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		ctx.Request(a.db, &database.MsgQueryData{
 			Database:   databaseName,
-			Collection: collectionNameData,
+			Collection: collectionUsosData,
+			PrefixID:   "",
+			Reverse:    false,
+		})
+		ctx.Request(a.db, &database.MsgQueryData{
+			Database:   databaseName,
+			Collection: collectionLocksData,
 			PrefixID:   "",
 			Reverse:    false,
 		})
@@ -110,21 +157,25 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return nil
 			}
 			switch msg.Collection {
-			case collectionNameData:
-
+			case collectionUsosData:
 				resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, msg.Data)
 				if err != nil {
-					return fmt.Errorf("send uso err: %s, %w", resp, err)
+					return fmt.Errorf("err post: %s, %w", resp, err)
 				}
-				ctx.Send(a.db, &database.MsgDeleteData{
-					ID:         msg.ID,
-					Database:   databaseName,
-					Collection: collectionNameData,
-				})
+			case collectionLocksData:
+				resp, err := utils.Post(a.httpClient, a.urlLock, a.userHttp, a.passHttp, msg.Data)
+				if err != nil {
+					return fmt.Errorf("err post: %s, %w", resp, err)
+				}
 			}
+			ctx.Send(a.db, &database.MsgDeleteData{
+				ID:         msg.ID,
+				Database:   databaseName,
+				Collection: msg.Collection,
+			})
 			return nil
 		}(); err != nil {
-			logs.LogError.Println(err)
+			logstrans.LogError.Printf("send err: transactionID with ID %s, err: %s", msg.ID, err)
 		}
 	}
 }
