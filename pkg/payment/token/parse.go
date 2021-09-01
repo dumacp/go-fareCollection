@@ -49,18 +49,30 @@ func ParseToPayment(uid uint64, ttype string, mapa map[string]interface{}) payme
 			case int64:
 				t.fid = uint(v)
 			}
-		case "exp":
-			exp := int64(0)
+		case "e":
+			exp := 0
 			switch v := value.(type) {
 			case int:
-				exp = int64(v)
+				exp = int(v)
 			case uint:
-				exp = int64(v)
+				exp = int(v)
 			case int64:
-				exp = int64(v)
+				exp = int(v)
 			default:
 			}
-			t.exp = time.Unix(exp, 0)
+			t.exp = time.Duration(exp) * time.Second
+		case "t":
+			date := int64(0)
+			switch v := value.(type) {
+			case int:
+				date = int64(v)
+			case uint:
+				date = int64(v)
+			case int64:
+				date = int64(v)
+			default:
+			}
+			t.date = time.Unix(date, 0)
 		case "pin":
 			v, _ := value.(string)
 			t.pin, _ = strconv.Atoi(v)

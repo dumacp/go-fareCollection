@@ -16,6 +16,8 @@ message Value {
    };
 };
 
+message MsgDetectPayment{}
+
 message MsgPayment{
 	uint64  uid = 1;
 	string type = 2;

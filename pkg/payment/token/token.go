@@ -12,7 +12,8 @@ type token struct {
 	pin             int
 	pid             uint
 	fid             uint
-	exp             time.Time
+	date            time.Time
+	exp             time.Duration
 	coord           string
 	data            map[string]interface{}
 	rawDataBefore   interface{}

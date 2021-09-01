@@ -23,6 +23,11 @@ type MsgVerifyInList struct {
 	ListID string
 	ID     []int64
 }
+
+func (l *MsgGetListById) GetPriority() int8 {
+	return 7
+}
+
 type MsgVerifyInListResponse struct {
 	ListID string
 	ID     []int64

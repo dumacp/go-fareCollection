@@ -9,6 +9,11 @@ type MsgGetFare struct {
 	ModeID           int
 	FromItineraryID  int
 }
+
+func (m *MsgGetFare) GetPriority() int8 {
+	return 7
+}
+
 type MsgFare struct {
 	Fare         int
 	FarePolicyID int

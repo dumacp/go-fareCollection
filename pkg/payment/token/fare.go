@@ -36,7 +36,7 @@ func (t *token) ApplyFare(data interface{}) (interface{}, error) {
 
 		return 0, errors.New("pin no es válido")
 	case qr.AQPM:
-		if t.exp.Before(time.Now()) {
+		if t.date.Add(t.exp).Before(time.Now()) {
 			return 0, errors.New("exp no es válido")
 		}
 		if len(t.historical) <= 0 {

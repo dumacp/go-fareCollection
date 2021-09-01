@@ -280,7 +280,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		})
 	case *recharge.Recharge:
 		logs.LogInfo.Printf("recharge: %+v", msg)
-		if msg.Exp.Before(time.Now()) {
+		if msg.Date.Add(msg.Exp).Before(time.Now()) {
 			err := NewErrorScreen("error en la recarga", "recarga expirada")
 			a.fmachine.Event(eError, err)
 			logs.LogError.Println(err)
@@ -425,6 +425,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if updates == nil {
 				if len(a.paym) > 0 {
 					delete(a.paym, msg.GetUid())
+				}
+				if ctx.Sender() != nil {
+					go func(ctxxx actor.Context, sender *actor.PID) {
+						time.Sleep(1 * time.Second)
+						sendMsg := &messages.MsgDetectPayment{}
+						ctxxx.Request(sender, sendMsg)
+					}(ctx, ctx.Sender())
 				}
 				break
 			}

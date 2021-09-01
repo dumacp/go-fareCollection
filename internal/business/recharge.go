@@ -13,28 +13,30 @@ func RechargeQR(paym payment.Payment,
 	if data == nil {
 		return nil, nil
 	}
-	if data.Exp.Before(time.Now()) {
-		return nil, nil
-	}
+
 	if paym.PID() != data.PID {
 		return nil, errors.New("tarjeta no coincide con la recarga")
 	}
 	if data.Value <= 0 {
 		return nil, errors.New("valor invalido")
 	}
-	lasth := paym.Historical()
 
+	if data.Date.Add(data.Exp).Before(time.Now()) {
+		return nil, errors.New("recarga expirada")
+	}
+
+	lasth := paym.Recharged()
 	tt := time.Now()
 	if len(lasth) > 0 {
 		tt = lasth[len(lasth)-1].TimeTransaction()
 	}
-	if tt.Before() {
-
+	if tt.After(data.Date) {
+		return nil, errors.New("recarga expirada")
 	}
 
 	//TODO: where get this param
 	ttype := 2
-	if err := paym.AddRecharge(data.Value, uint(data.DeviceID), uint(ttype), uint(data.Seq)); err != nil {
+	if err := paym.AddRecharge(data.Value, uint(data.DeviceID), uint(ttype), uint(data.TID)); err != nil {
 		return nil, err
 	}
 

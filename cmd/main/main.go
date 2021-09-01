@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/AsynkronIT/protoactor-go/mailbox"
 	appreader "github.com/dumacp/go-appliance-contactless/pkg/app"
 	"github.com/dumacp/go-fareCollection/internal/app"
 	"github.com/dumacp/go-fareCollection/internal/fare"
@@ -23,6 +25,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/usostransporte"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
+	"github.com/dumacp/smartcard"
 	"github.com/dumacp/smartcard/multiiso"
 	"github.com/google/uuid"
 )
@@ -67,7 +70,7 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
-	propsFare := actor.PropsFromProducer(fare.NewActor)
+	propsFare := actor.PropsFromProducer(fare.NewActor).WithMailbox(mailbox.UnboundedPriority())
 	pidFare, err := ctx.SpawnNamed(propsFare, "fare-actor")
 	if err != nil {
 		logs.LogError.Fatalln(err)
@@ -102,7 +105,7 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
-	propsList := actor.PropsFromProducer(lists.NewActor)
+	propsList := actor.PropsFromProducer(lists.NewActor).WithMailbox(mailbox.UnboundedPriority())
 
 	pidList, err := ctx.SpawnNamed(propsList, "list-actor")
 	if err != nil {
@@ -125,13 +128,32 @@ func main() {
 	}
 
 	// init contactless reader
-	dev, err := multiiso.NewDevice(serial, baud, time.Millisecond*600)
-	if err != nil {
-		logs.LogError.Fatalln(err)
-	}
-	reader := multiiso.NewReader(dev, "multiiso", 1)
+	var dev *multiiso.Device
+	funcReader := func() smartcard.IReader {
+		exec.Command("/bin/sh", "-c", "echo 0 > /sys/class/leds/enable-reader/brightness").Run()
+		time.Sleep(1 * time.Second)
+		if res, err := exec.Command("/bin/sh", "-c", "echo 1 > /sys/class/leds/enable-reader/brightness").CombinedOutput(); err != nil {
+			log.Printf("%s, err: %s", res, err)
+		}
+		time.Sleep(1 * time.Second)
 
-	readerActor, err := appreader.NewActor(ctx, reader)
+		dev, err = multiiso.NewDevice(serial, baud, time.Millisecond*600)
+		if err != nil {
+			logs.LogError.Fatalln(err)
+		}
+		reader := multiiso.NewReader(dev, "multiiso", 1)
+		return reader
+	}
+
+	// TEST
+	// go func() {
+	// 	time.Sleep(20 * time.Second)
+	// 	dev.Close()
+	// 	time.Sleep(30 * time.Second)
+	// 	dev.Close()
+	// }()
+
+	readerActor, err := appreader.NewActor(ctx, funcReader)
 	if err != nil {
 		logs.LogError.Fatalln(err)
 	}

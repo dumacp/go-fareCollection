@@ -51,9 +51,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if ctx.Parent() != nil {
 			ctx.Send(ctx.Parent(), msg)
 		}
+	case *messages.MsgDetectPayment:
 	case *messages.MsgWritePayment:
 		switch msg.Type {
-		case "ENDUSER_QR":
+		case EQPM:
 			select {
 			case a.chRand <- 1:
 			case <-time.After(100 * time.Millisecond):
@@ -90,7 +91,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 				}
 				logs.LogInfo.Printf("PMRT: %+v", rechQR)
 				rechg := new(recharge.Recharge)
-				rechg.Exp = time.Unix(rechQR.Exp/1000, (rechQR.Exp%1000)*1_000_0000)
+				date := time.Unix(rechQR.Date, 0)
+				rechg.Date = date
+				rechg.Exp = time.Duration(rechQR.Exp) * time.Second
 				varSplit := strings.Split(rechQR.PID, "-")
 				id := 0
 				if len(varSplit) > 0 {
