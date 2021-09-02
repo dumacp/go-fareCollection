@@ -593,17 +593,18 @@ func (a *Actor) Receive(ctx actor.Context) {
 				// }
 				// logs.LogInfo.Printf("msg seq: %d", msg.Seq)
 
-				if len(hr) > 0 && hr[len(hr)-1].ConsecutiveID() == uint(msg.GetSeq()) &&
-					hr[len(hr)-1].DeviceID() == uint(a.deviceIDnum) {
-					logstrans.LogInfo.Printf("payment recharged: %+v", hr[len(hr)-1])
-					uso.TransactionType = "TFC_WITH_BALANCE_RECHARGE"
-					// uso.RechargeTokenId = int(a.recharge.TID)
-					// uso.RechargeValue = a.recharge.Value
-					// logs.LogInfo.Printf("last hist: %+v", hr[len(hr)-1])
-					if v := hr[len(hr)-1].RechargeProp("RechargeTokenId"); v != nil {
-						if tid, ok := v.(int); ok {
-							uso.RechargeTokenId = int(tid)
-							uso.RechargeValue = hr[len(hr)-1].Value()
+				if len(hr) > 0 &&
+					hr[len(hr)-1].DeviceID() == uint(a.deviceIDnum) &&
+					hr[len(hr)-1].RechargeProp("Seq") != nil {
+					seq, ok := hr[len(hr)-1].RechargeProp("Seq").(int)
+					if ok && int32(seq) == msg.GetSeq() {
+						logstrans.LogInfo.Printf("payment recharged: %+v", hr[len(hr)-1])
+						uso.TransactionType = "TFC_WITH_BALANCE_RECHARGE"
+						if v := hr[len(hr)-1].RechargeProp("RechargeTokenId"); v != nil {
+							if tid, ok := v.(int); ok {
+								uso.RechargeTokenId = int(tid)
+								uso.RechargeValue = hr[len(hr)-1].Value()
+							}
 						}
 					}
 				}

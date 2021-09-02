@@ -31,7 +31,7 @@ func RechargeQR(paym payment.Payment,
 		tt = lasth[len(lasth)-1].TimeTransaction()
 	}
 	if tt.After(data.Date) {
-		return nil, errors.New("recarga expirada")
+		return nil, errors.New("recarga ya no es válida")
 	}
 
 	//TODO: where get this param
@@ -43,6 +43,7 @@ func RechargeQR(paym payment.Payment,
 	if len(paym.Recharged()) > 0 {
 		// logs.LogInfo.Printf("len hist re: %d", len(paym.Recharged()))
 		paym.Recharged()[len(paym.Recharged())-1].SetRechargeProp("RechargeTokenId", data.TID)
+		paym.Recharged()[len(paym.Recharged())-1].SetRechargeProp("Seq", data.Seq)
 	}
 
 	return paym.Updates(), nil
