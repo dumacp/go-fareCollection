@@ -1,0 +1,13 @@
+package app
+
+import "flag"
+
+// var urlQr = "https://fleet.nebulae.com.co/siv/enduser-qr-purchase/enduser-qr-purchases/new?i=%d&d=%s&p=%d"
+
+// var urlQr = "https://tinyurl.com/jmdpcr59/new?i=%d&d=%s&p=%d"
+
+var UrlQR string
+
+func init() {
+	flag.StringVar(&UrlQR, "urlQR", "https://tinyurl.com/jmdpcr59", "url QR")
+}

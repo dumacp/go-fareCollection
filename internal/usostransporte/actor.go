@@ -15,8 +15,8 @@ import (
 
 const (
 	// transURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/fare-transaction"
-	transURL        = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/payment-medium-transaction"
-	lockUrl         = "http://192.168.188.69:3100/api/external-system-gateway/rest/payment-medium-blocked"
+	transURL        = "%s/api/external-system-gateway/rest/payment-medium-transaction"
+	lockUrl         = "%s/api/external-system-gateway/rest/payment-medium-blocked"
 	defaultUsername = "dev.nebulae"
 	// filterHttpQuery    = "?page=%d&count=%d&active=true"
 	defaultPassword     = "uno.2.tres"
@@ -48,8 +48,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *actor.Started:
 
 		//TODO: how get this params?
-		a.url = transURL
-		a.urlLock = lockUrl
+		a.url = fmt.Sprintf(transURL, utils.Url)
+		a.urlLock = fmt.Sprintf(lockUrl, utils.Url)
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 

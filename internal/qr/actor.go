@@ -113,6 +113,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				if err := json.Unmarshal(mess.Value, sendMsg); err != nil {
 					return fmt.Errorf("QR error: %w", err)
 				}
+				logs.LogInfo.Printf("DCIT: %+v", sendMsg)
 				if ctx.Parent() != nil {
 					ctx.Send(ctx.Parent(), sendMsg)
 				}

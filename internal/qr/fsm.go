@@ -16,7 +16,7 @@ import (
 
 const (
 	portSerial = "/dev/ttyQR"
-	portSpeed  = 9600
+	portSpeed  = 19200
 )
 
 const (
@@ -133,7 +133,7 @@ func (a *Actor) RunFSM(quit <-chan int) {
 				}
 				var err error
 				succ := false
-				for _, baud := range []int{9600, 19200, 9600} {
+				for _, baud := range []int{19200, 9600, 19200} {
 					config.Baud = baud
 					port, err = serial.OpenPort(config)
 					if err != nil {

@@ -41,6 +41,7 @@ type Parameters struct {
 	Outputs          int      `json:"outputs"`
 	Seq              uint     `json:"seq"`
 	DevSerial        int      `json:"devSerial"`
+	UrlQR            string   `json:"urlQR"`
 }
 
 func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
@@ -50,6 +51,7 @@ func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
 	p.Timeout = params.Timeout()
 	p.DevSerial = params.Serial()
 	p.Timestamp = params.Timestamp
+	p.UrlQR = params.URLQR()
 	return p
 }
 
@@ -120,6 +122,18 @@ func (p *PlatformParameters) Timeout() int {
 	}
 
 	return res
+}
+
+func (p *PlatformParameters) URLQR() string {
+	if p.Props == nil {
+		return ""
+	}
+	url, ok := p.Props["QR_URL"]
+	if !ok {
+		return ""
+	}
+
+	return url
 }
 
 func (p *PlatformParameters) Serial() int {

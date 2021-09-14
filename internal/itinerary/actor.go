@@ -29,9 +29,9 @@ type Actor struct {
 }
 
 const (
-	defaultModeURL      = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device_modes"
-	defaultRouteURL     = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device_routes"
-	defaultItineraryURL = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device_itineraries"
+	defaultModeURL      = "%s/api/external-system-gateway/rest/device_modes"
+	defaultRouteURL     = "%s/api/external-system-gateway/rest/device_routes"
+	defaultItineraryURL = "%s/api/external-system-gateway/rest/device_itineraries"
 	defaultUsername     = "dev.nebulae"
 	filterHttpQuery     = "?page=%d&count=%d&active=true"
 	defaultPassword     = "uno.2.tres"
@@ -69,9 +69,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *actor.Started:
 
 		//TODO: how get this params?
-		a.urlMode = defaultModeURL
-		a.urlRoute = defaultRouteURL
-		a.urlItinerary = defaultItineraryURL
+		a.urlMode = fmt.Sprintf(defaultModeURL, utils.Url)
+		a.urlRoute = fmt.Sprintf(defaultRouteURL, utils.Url)
+		a.urlItinerary = fmt.Sprintf(defaultItineraryURL, utils.Url)
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 

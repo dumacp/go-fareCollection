@@ -37,7 +37,7 @@ func main() {
 	svc := database.NewService(db)
 
 	query := func(data []byte) bool {
-		log.Printf("el: %s", data)
+		// log.Printf("el: %s", data)
 		return true
 	}
 	time.Sleep(3 * time.Second)

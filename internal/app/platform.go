@@ -176,7 +176,7 @@ func SendUsoTAG(name string, tid int, newtag map[string]interface{}, tag map[str
 			logs.LogWarn.Printf("POST result: %s", result)
 			return
 		}
-		logs.LogInfo.Printf("POST result: %s", result)
+		// logs.LogInfo.Printf("POST result: %s", result)
 
 		queueSend.Remove(el)
 		el = prev
@@ -234,7 +234,7 @@ func SendUsoQR(tid int, gps []float64, timeStamp time.Time) {
 			logs.LogWarn.Printf("POST result: %s; Error: %s", result, err)
 			return
 		}
-		logs.LogInfo.Printf("POST result: %s", result)
+		// logs.LogInfo.Printf("POST result: %s", result)
 
 		queueSend.Remove(el)
 		el = prev

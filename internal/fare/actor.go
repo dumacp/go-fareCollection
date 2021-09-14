@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultListURL     = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/device-fares"
+	defaultListURL     = "%s/api/external-system-gateway/rest/device-fares"
 	filterHttpQuery    = "?page=%d&count=%d&queryTotalResultCount=%v"
 	defaultUsername    = "dev.nebulae"
 	defaultPassword    = "uno.2.tres"
@@ -49,7 +49,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *actor.Started:
 		a.farePolicies = make(map[int]*FareNode)
 
-		a.url = defaultListURL
+		a.url = fmt.Sprintf(defaultListURL, utils.Url)
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 
@@ -200,12 +200,12 @@ func (a *Actor) Receive(ctx actor.Context) {
 				// }
 				q.LastFare = append(q.LastFare, fare)
 			}
-			logs.LogInfo.Printf("fare query: %#v", q)
+			logs.LogBuild.Printf("fare query: %#v", q)
 			fare := a.fareMap.FindFare(q)
 			if fare == nil {
 				return nil, errors.New("fare Policy not found")
 			}
-			logs.LogInfo.Printf("fare found out: %#v", q)
+			logs.LogBuild.Printf("fare found out: %#v", q)
 			return fare, nil
 		}(); err != nil {
 			if ctx.Sender() != nil {

@@ -22,6 +22,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/internal/recharge"
 	"github.com/dumacp/go-fareCollection/internal/usostransporte"
+	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 	"github.com/dumacp/go-logs/pkg/logs"
@@ -89,9 +90,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Stopping:
+		logs.LogWarn.Printf("\"%s\" - Stopped actor, reason -> %v", ctx.Self(), msg)
 		ctx.Send(ctx.Self(), &MsgWriteAppParams{})
 		ctx.Send(ctx.Self(), &MsgWriteErrorVerify{})
 	case *actor.Started:
+		logs.LogInfo.Printf("started \"%s\", %v", ctx.Self().GetId(), ctx.Self())
 		if err := func() error {
 			// a.params = new(parameters.Parameters)
 			propsGrpah := actor.PropsFromProducer(graph.NewActor)
@@ -150,6 +153,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if ctx.Sender() != nil {
 			a.pidParams = ctx.Sender()
 		}
+		if a.params == nil {
+			if a.pidGraph != nil {
+				a.ctx.Send(a.pidGraph, &graph.MsgWaitTag{
+					Message: "presente medio\r\nde pago",
+					Ruta:    fmt.Sprintf("Ruta: %d", msg.Data.PaymentItinerary),
+				})
+			}
+		}
 		a.params = msg.Data
 		a.timeout = a.params.Timeout
 		if a.params.Seq >= uint(a.seq) {
@@ -169,7 +180,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				a.ctx.Send(a.pidGraph, &graph.MsgRef{
 					Device:  fmt.Sprintf("%s-%d", a.deviceID, a.deviceIDnum),
 					Version: a.version,
-					Ruta:    fmt.Sprintf("%d", a.params.PaymentItinerary),
+					Ruta:    fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary),
 				})
 			}
 			a.deviceIDnum = a.params.DevSerial
@@ -665,10 +676,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 		a.oldRand = a.newRand
 		a.newRand = msg.Value
 		var v string
-		if a.params == nil {
-			v = "https://fleet.nebulae.com.co/siv"
+		if a.params == nil || len(a.params.UrlQR) <= 0 {
+			v = fmt.Sprintf("%s/siv", utils.Url)
 		} else {
-			v = fmt.Sprintf(urlQr, a.params.PaymentItinerary, a.deviceID, msg.Value)
+			v = fmt.Sprintf(qr.UrlQRformat, a.params.UrlQR, a.params.PaymentItinerary, a.deviceID, msg.Value)
 		}
 		ctx.Send(a.pidGraph, &graph.MsgQrValue{Value: v})
 	}

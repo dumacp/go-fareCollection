@@ -172,8 +172,8 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 						fmt.Printf("close query datadb")
 						return nil
 					case data <- &QueryType{ID: string(k), Data: v}:
-					case <-time.After(1 * time.Second):
-						fmt.Printf("timeout query datadb")
+					case <-time.After(10 * time.Second):
+						fmt.Printf("timeout query datadb, %s", collection)
 					}
 				}
 			} else {
@@ -184,8 +184,8 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 						fmt.Printf("close query datadb")
 						return nil
 					case data <- &QueryType{ID: string(k), Data: v}:
-					case <-time.After(1 * time.Second):
-						fmt.Printf("timeout query datadb")
+					case <-time.After(10 * time.Second):
+						fmt.Printf("timeout query datadb, %s", collection)
 					}
 				}
 			}
@@ -198,8 +198,8 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 						fmt.Printf("close query datadb")
 						return nil
 					case data <- &QueryType{ID: string(k), Data: v}:
-					case <-time.After(1 * time.Second):
-						fmt.Printf("timeout query datadb")
+					case <-time.After(10 * time.Second):
+						fmt.Printf("timeout query datadb, %s", collection)
 					}
 				}
 			} else {
@@ -210,8 +210,8 @@ func QueryData(data chan *QueryType, stop chan int, database, collection string,
 						fmt.Printf("close query datadb")
 						return nil
 					case data <- &QueryType{ID: string(k), Data: v}:
-					case <-time.After(1 * time.Second):
-						fmt.Printf("timeout query datadb")
+					case <-time.After(10 * time.Second):
+						fmt.Printf("timeout query datadb, %s", collection)
 					}
 				}
 			}

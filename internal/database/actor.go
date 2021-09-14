@@ -248,7 +248,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 	case *MsgQueryData:
 		if err := func() error {
 			prefix := []byte(msg.PrefixID)
-			data := make(chan *QueryType)
+			data := make(chan *QueryType, 15)
 			stop := make(chan int)
 			pidSender := ctx.Sender()
 
@@ -272,7 +272,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 						Database:   msg.Database,
 						Collection: msg.Collection,
 					}, 10*time.Second).Wait(); err != nil {
-						logs.LogBuild.Printf("error send datadb: %s, %s", err, pid)
+						logs.LogWarn.Printf("error send datadb: %s, %s", err, pid)
 						select {
 						case <-stop:
 						default:

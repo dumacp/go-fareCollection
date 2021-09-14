@@ -14,7 +14,17 @@ import (
 // 	// timeout = 30
 // )
 
+// var urlQr = "https://tinyurl.com/jmdpcr59/new?i=%d&d=%s&p=%d"
+
+const (
+	UrlQRformat = "%s/jmdpcr59/new?i=%d&d=%s&p=%d"
+)
+
 var ErrorCipher = errors.New("error in CIPHER")
+
+// func init() {
+// 	flag.StringVar(&UrlQR, "urlQR", "https://tinyurl.com/jmdpcr59", "url QR")
+// }
 
 type QrCode struct {
 	Route         string `json:"r"`

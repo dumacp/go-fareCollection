@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultURL         = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/dev-summary"
+	defaultURL         = "%s/api/external-system-gateway/rest/dev-summary"
 	defaultUsername    = "dev.nebulae"
 	filterHttpQuery    = "?page=%d&count=%d&active=true"
 	defaultPassword    = "uno.2.tres"
@@ -67,7 +67,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 	case *actor.Started:
 
 		//TODO: how get this params?
-		a.url = defaultURL
+		a.url = fmt.Sprintf(defaultURL, utils.Url)
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 
