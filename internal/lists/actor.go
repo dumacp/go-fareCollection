@@ -8,6 +8,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/internal/database"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
@@ -25,7 +26,7 @@ type Actor struct {
 }
 
 const (
-	defaultListURL     = "https://fleet.nebulae.com.co/api/external-system-gateway/rest/payment-medium-lists"
+	defaultListURL     = "%s/api/external-system-gateway/rest/payment-medium-lists"
 	filterHttpQuery    = "page=%d&count=%d&queryTotalResultCount=%v&active=%v"
 	defaultUsername    = "dev.nebulae"
 	defaultPassword    = "uno.2.tres"
@@ -44,7 +45,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
-		a.url = defaultListURL
+		a.url = fmt.Sprintf(defaultListURL, utils.Url)
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 
@@ -56,8 +57,16 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.db = db.PID()
 		}
 
+		select {
+		case <-a.quit:
+		default:
+			if a.quit != nil {
+				close(a.quit)
+			}
+		}
 		a.quit = make(chan int)
-		go tick(ctx, 10*time.Minute, a.quit)
+		//TODO: change delay
+		go tick(ctx, 2*time.Minute, a.quit)
 		//TODO:
 		// get http parameters
 	case *actor.Stopping:
@@ -243,6 +252,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 					return
 				}
 			}
+			logstrans.LogInfo.Printf("new restrictive list: %v", list)
 			if a.db != nil {
 				ctx.Send(a.db, &database.MsgUpdateData{
 					Database:   databaseName,

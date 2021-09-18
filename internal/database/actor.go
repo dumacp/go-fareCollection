@@ -248,7 +248,7 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 	case *MsgQueryData:
 		if err := func() error {
 			prefix := []byte(msg.PrefixID)
-			data := make(chan *QueryType, 15)
+			data := make(chan *QueryType, 0)
 			stop := make(chan int)
 			pidSender := ctx.Sender()
 

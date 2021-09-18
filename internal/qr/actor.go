@@ -37,12 +37,16 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
-		a.fmachine.Event(eOpened)
+
 		a.quit = make(chan int)
 		go a.RunFSM(a.quit)
+
 		a.chRand = make(chan int)
 		go tickQR(ctx, a.chRand)
+		a.fmachine.Event(eOpened)
 	case *actor.Stopping:
+		logs.LogWarn.Printf("Message arrived in qrActor: %s, %T, %s",
+			ctx.Message(), ctx.Message(), ctx.Sender())
 		close(a.chRand)
 		close(a.quit)
 	case *MsgNewCodeQR:

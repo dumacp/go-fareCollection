@@ -17,7 +17,7 @@ import (
 // var urlQr = "https://tinyurl.com/jmdpcr59/new?i=%d&d=%s&p=%d"
 
 const (
-	UrlQRformat = "%s/jmdpcr59/new?i=%d&d=%s&p=%d"
+	UrlQRformat = "%s/new?i=%d&d=%s&p=%d"
 )
 
 var ErrorCipher = errors.New("error in CIPHER")
@@ -35,7 +35,7 @@ type QrCode struct {
 
 func tickQR(ctx actor.Context, ch <-chan int) {
 
-	timeout := 30 * time.Second
+	timeout := 120 * time.Second
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTimer(5 * time.Second)

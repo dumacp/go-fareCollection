@@ -92,6 +92,8 @@ func NewFSM(callbacks fsm.Callbacks) *fsm.FSM {
 func (a *Actor) RunFSM(quit <-chan int) {
 
 	if err := func() (errr error) {
+		// chQR := make(chan []byte)
+		// chErr := make(chan error)
 		defer func() {
 			if r := recover(); r != nil {
 				logs.LogError.Println("Recovered in \"startfsm() app\", ", r)
@@ -104,13 +106,17 @@ func (a *Actor) RunFSM(quit <-chan int) {
 					errr = errors.New("unknown panic")
 				}
 			}
+			// close(chQR)
+			// close(chErr)
+
 		}()
 
 		var port *serial.Port
 		var reader *bufio.Reader
+		// var scann *bufio.Scanner
 		lastState := ""
 		lastRead := ""
-		lastTime := time.Now().Add(300 * time.Second)
+		lastTime := time.Now().Add(30 * time.Second)
 
 		for {
 			select {
@@ -120,7 +126,7 @@ func (a *Actor) RunFSM(quit <-chan int) {
 			}
 			if lastState != a.fmachine.Current() {
 				lastState = a.fmachine.Current()
-				logs.LogBuild.Printf("current state QR reader: %s", a.fmachine.Current())
+				logs.LogInfo.Printf("current state QR reader: %s", a.fmachine.Current())
 			}
 
 			switch a.fmachine.Current() {
@@ -129,7 +135,7 @@ func (a *Actor) RunFSM(quit <-chan int) {
 				config := &serial.Config{
 					Name: portSerial,
 					Baud: 9600,
-					//ReadTimeout: time.Second * 3,
+					// ReadTimeout: time.Second * 10,
 				}
 				var err error
 				succ := false
@@ -137,7 +143,7 @@ func (a *Actor) RunFSM(quit <-chan int) {
 					config.Baud = baud
 					port, err = serial.OpenPort(config)
 					if err != nil {
-						time.Sleep(2 * time.Second)
+						time.Sleep(3 * time.Second)
 						continue
 					}
 					if _, err = port.Write([]byte("?")); err != nil {
@@ -158,19 +164,62 @@ func (a *Actor) RunFSM(quit <-chan int) {
 					}
 				}
 				if !succ {
-					return err
+					logs.LogError.Printf("QR error open: %s", err)
+					// time.Sleep(10 * time.Second)
+					break
+					// return err
 				}
 				reader = bufio.NewReader(port)
+				// scann = bufio.NewScanner(port)
 				a.fmachine.Event(eRead)
 			case sRead:
 
 				if err := func() error {
+					// go func() {
+					// buff := make([]byte, 1024)
+					// v, err := reader.ReadBytes(0x0D)
+					// if err != nil {
+					// 	logs.LogWarn.Printf("QR error test: %s, %v", err, v)
+					// 	if !errors.Is(err, io.EOF) {
+					// 		chErr <- fmt.Errorf("QR read error: %s", err)
+					// 	}
+					// }
+					// chQR <- v
+					// if n <= 0 {
+					// 	chQR <- nil
+					// } else {
+					// 	if buff[n-1] == 0x0D && n > 1 {
+					// 		chQR <- buff[:n-1]
+					// 	} else {
+					// 		chQR <- buff[:n]
+					// 	}
+					// }
+					// }()
+					// var v []byte
+					// select {
+					// case <-time.After(15 * time.Second):
+					// 	a.fmachine.Event(eError)
+					// 	return fmt.Errorf("QR timeout read error")
+					// case data := <-chQR:
+					// 	v = make([]byte, len(data))
+					// 	copy(v, data)
+					// case err := <-chErr:
+					// 	a.fmachine.Event(eError)
+					// 	return err
+					// }
 					v, err := reader.ReadBytes(0x0D)
 					if err != nil {
-						if !errors.Is(err, io.EOF) {
-							a.fmachine.Event(eError)
-							return fmt.Errorf("QR read error: %s", err)
-						}
+						// if !errors.Is(err, io.EOF) {
+						a.fmachine.Event(eError)
+						return fmt.Errorf("QR read error: %s", err)
+						// }
+						// return nil
+					}
+					defer func() {
+						lastTime = time.Now()
+						lastRead = string(v)
+					}()
+					if len(v) <= 0 {
 						return nil
 					}
 					// code := base64.RawStdEncoding.EncodeToString(v)
@@ -179,20 +228,21 @@ func (a *Actor) RunFSM(quit <-chan int) {
 							return nil
 						}
 					}
-					lastTime = time.Now()
-					lastRead = string(v)
 					logs.LogBuild.Printf("QR read: %s", v)
 					data, err := base64.StdEncoding.DecodeString(string(v))
 					if err != nil {
 						return fmt.Errorf("QR error: %w", err)
 					}
-
 					a.ctx.Request(a.ctx.Parent(), &MsgNewCodeQR{Value: data})
 					return nil
 				}(); err != nil {
 					logs.LogError.Println(err)
 				}
 			case sClose:
+				if port != nil {
+					port.Close()
+				}
+				a.fmachine.Event(eOpened)
 			}
 			time.Sleep(10 * time.Millisecond)
 
@@ -201,5 +251,5 @@ func (a *Actor) RunFSM(quit <-chan int) {
 		logs.LogError.Printf("QR error: %s", err)
 		//TODO send MsgFatal
 	}
-
+	logs.LogError.Println("QR error: disconnect")
 }

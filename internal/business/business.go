@@ -50,7 +50,7 @@ func ParsePayment(msg *messages.MsgPayment) (payment.Payment, error) {
 	raw := msg.GetRaw()
 
 	switch msg.GetType() {
-	case "MIFARE_PLUS_EV2_4K":
+	case "MIFARE":
 		paym = mplus.ParseToPayment(msg.Uid, msg.GetType(), mcard)
 		raw["mv"] = "3"
 	case qr.EQPM:
@@ -95,7 +95,7 @@ func VerifyListRestrictive(ctx actor.Context, pidList *actor.PID, paymType strin
 func CalcUpdatesWithFare(ctx actor.Context, pidFare *actor.PID, deviceID int,
 	paym payment.Payment, params *parameters.Parameters) (map[string]interface{}, error) {
 	switch paym.Type() {
-	case "MIFARE_PLUS_EV2_4K":
+	case "MIFARE":
 		lastFares := make(map[int64]int)
 		hs := paym.Historical()
 		for _, v := range hs {

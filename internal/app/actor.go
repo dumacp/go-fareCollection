@@ -19,12 +19,14 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/picto"
+	"github.com/dumacp/go-fareCollection/internal/pubsub"
 	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/internal/recharge"
 	"github.com/dumacp/go-fareCollection/internal/usostransporte"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
+	"github.com/dumacp/go-fareCollection/pkg/services"
 	"github.com/dumacp/go-logs/pkg/logs"
 	semessages "github.com/dumacp/go-sesam/pkg/messages"
 	"github.com/looplab/fsm"
@@ -125,6 +127,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return err
 			}
 			a.pidQR = pidQR
+
+			pubsub.Subscribe(services.TopicAddress, ctx.Self(),
+				func(msg []byte) interface{} {
+					return &MsgReqAddress{Addr: string(msg)}
+				})
 			return nil
 		}(); err != nil {
 			logs.LogError.Println(err)
@@ -178,7 +185,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		if a.params.DevSerial > 0 {
 			if a.pidGraph != nil {
 				a.ctx.Send(a.pidGraph, &graph.MsgRef{
-					Device:  fmt.Sprintf("%s-%d", a.deviceID, a.deviceIDnum),
+					Device:  a.deviceID,
 					Version: a.version,
 					Ruta:    fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary),
 				})
@@ -200,6 +207,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		a.listRestrictive[msg.ID] = msg
 		logstrans.LogInfo.Printf("watch over lists: %+v", a.listRestrictive)
+	case *MsgReqAddress:
+
 	case *messages.RegisterFareActor:
 		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
 	case *messages.RegisterListActor:
@@ -330,7 +339,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				return paym.Updates(), NewErrorScreen("tarjeta bloqueada", "tarjeta en listas restrictivas")
 			}
 			switch paym.Type() {
-			case "MIFARE_PLUS_EV2_4K":
+			case "MIFARE":
 				// logstrans.LogInfo.Printf("rewrite try, uid: %d, last: %d", msg.Uid, a.lastWriteError)
 				lastPaym := a.paym[msg.GetUid()]
 				if business.Rewrite(paym, lastPaym, a.lastWriteError) {
@@ -475,7 +484,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		raw := msg.GetRaw()
 		raw["mv"] = fmt.Sprintf("%d", lastPaym.VersionLayout())
 		switch msg.GetType() {
-		case "MIFARE_PLUS_EV2_4K":
+		case "MIFARE":
 			raw["mv"] = "3"
 		}
 		lastPaym.SetRawDataAfter(raw)
@@ -568,7 +577,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			// raw := msg.GetRaw()
 			// raw["mv"] = fmt.Sprintf("%d", lastPaym.VersionLayout())
 			switch msg.GetType() {
-			case "MIFARE_PLUS_EV2_4K":
+			case "MIFARE":
 				//TODO: ?
 				raw["mv"] = "3"
 				a.fmachine.Event(eCardValidated, lastPaym.Balance())
@@ -597,7 +606,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 				},
 			}
 			switch msg.Type {
-			case "MIFARE_PLUS_EV2_4K":
+			case "MIFARE":
 				hr := lastPaym.Recharged()
 				// for i, v := range hr {
 				// 	logs.LogInfo.Printf("last hist %d: %+v", i, v)
@@ -635,12 +644,16 @@ func (a *Actor) Receive(ctx actor.Context) {
 			iv = append(iv, revDiv...)
 			iv = append(iv, divInput...)
 			iv = append(iv, revDiv...)
+			keySlot := 51
+			if a.params != nil && a.params.KeyQr > 0 {
+				keySlot = a.params.KeyQr
+			}
 			mdec := &semessages.MsgDecryptRequest{
 				Data:     msg.Value[4:],
 				DevInput: divInput[0:4],
 				IV:       iv,
 				//TODO: How to get ?
-				KeySlot: 0x33,
+				KeySlot: keySlot,
 			}
 			// logs.LogBuild.Printf("QR crypt: [% X], len: %d; [% X], len: %d",
 			// 	mdec.Data, len(mdec.Data), mdec.DevInput, len(mdec.DevInput))

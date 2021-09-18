@@ -42,6 +42,7 @@ type Parameters struct {
 	Seq              uint     `json:"seq"`
 	DevSerial        int      `json:"devSerial"`
 	UrlQR            string   `json:"urlQR"`
+	KeyQr            int      `json:"keyQR"`
 }
 
 func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
@@ -52,6 +53,7 @@ func (p *Parameters) FromPlatform(params *PlatformParameters) *Parameters {
 	p.DevSerial = params.Serial()
 	p.Timestamp = params.Timestamp
 	p.UrlQR = params.URLQR()
+	p.KeyQr = params.KeyQR()
 	return p
 }
 
@@ -134,6 +136,23 @@ func (p *PlatformParameters) URLQR() string {
 	}
 
 	return url
+}
+
+func (p *PlatformParameters) KeyQR() int {
+	if p.Props == nil {
+		return 0
+	}
+	key, ok := p.Props["QR_SLOT_KEY"]
+	if !ok {
+		return 0
+	}
+
+	res, err := strconv.Atoi(key)
+	if err != nil {
+		return 0
+	}
+
+	return int(res)
 }
 
 func (p *PlatformParameters) Serial() int {

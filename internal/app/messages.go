@@ -17,3 +17,6 @@ package app
 type MsgTick struct{}
 type MsgWriteErrorVerify struct{}
 type MsgWriteAppParams struct{}
+type MsgReqAddress struct {
+	Addr string
+}

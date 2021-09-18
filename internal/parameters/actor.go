@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	defaultURL         = "%s/api/external-system-gateway/rest/dev-summary"
+	defaultURL = "%s/api/external-system-gateway/rest/dev-summary"
+	// paymentMediumURL   = "%s/api/external-system-gateway/rest/payment-medium-types/"
 	defaultUsername    = "dev.nebulae"
 	filterHttpQuery    = "?page=%d&count=%d&active=true"
 	defaultPassword    = "uno.2.tres"
@@ -25,11 +26,12 @@ const (
 )
 
 type Actor struct {
-	quit               chan int
-	httpClient         *http.Client
-	userHttp           string
-	passHttp           string
-	url                string
+	quit       chan int
+	httpClient *http.Client
+	userHttp   string
+	passHttp   string
+	url        string
+	// mediumUrl          string
 	id                 string
 	db                 *actor.PID
 	evs                *eventstream.EventStream
@@ -68,6 +70,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 		//TODO: how get this params?
 		a.url = fmt.Sprintf(defaultURL, utils.Url)
+
 		a.passHttp = defaultPassword
 		a.userHttp = defaultUsername
 
@@ -80,7 +83,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 		a.quit = make(chan int)
-		go tick(ctx, 60*time.Minute, a.quit)
+		go tick(ctx, 15*time.Minute, a.quit)
 
 	case *actor.Stopping:
 		close(a.quit)

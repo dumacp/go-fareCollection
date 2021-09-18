@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/binary"
 	"flag"
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/AsynkronIT/protoactor-go/mailbox"
+	"github.com/AsynkronIT/protoactor-go/remote"
 	appreader "github.com/dumacp/go-appliance-contactless/pkg/app"
 	"github.com/dumacp/go-fareCollection/internal/app"
 	"github.com/dumacp/go-fareCollection/internal/fare"
@@ -23,6 +26,7 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/pubsub"
 	"github.com/dumacp/go-fareCollection/internal/usostransporte"
+	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-logs/pkg/logs"
 	"github.com/dumacp/smartcard"
@@ -31,7 +35,7 @@ import (
 )
 
 const (
-	version = "1.0.0"
+	version = "1.0.1"
 )
 
 var verbose int
@@ -45,7 +49,7 @@ var prefixlogs string
 func init() {
 	flag.IntVar(&verbose, "verbose", 0, "level log\n\t0: Error\n\t1: Warning\n\t2: Info\n\t3: Debug")
 	flag.BoolVar(&logstd, "logStd", false, "logs in stderr?")
-	flag.StringVar(&id, "id", "OMZV7-0001", "device ID")
+	flag.StringVar(&id, "id", "", "device ID")
 	flag.StringVar(&serial, "serial", "/dev/ttymxc4", "device path")
 	flag.IntVar(&baud, "baud", 460800, "device baud speed")
 	flag.StringVar(&dirlogs, "dirlogs", "/SD/logs/", "dir path to logs")
@@ -57,9 +61,29 @@ func main() {
 	initLogs(verbose, logstd)
 	initLogsTransactional(dirlogs, prefixlogs, verbose, logstd)
 
+	fmt.Printf("url: %s\n", utils.Url)
+
 	logs.LogBuild.Println("debug log")
 
-	ctx := actor.NewActorSystem().Root
+	sys := actor.NewActorSystem()
+	ctx := sys.Root
+
+	portlocal := 8009
+	for {
+		portlocal++
+
+		socket := fmt.Sprintf("127.0.0.1:%d", portlocal)
+		testConn, err := net.DialTimeout("tcp", socket, 1*time.Second)
+		if err != nil {
+			break
+		}
+		logs.LogWarn.Printf("socket busy -> \"%s\"", socket)
+		testConn.Close()
+		time.Sleep(1 * time.Second)
+	}
+
+	rconfig := remote.Configure("127.0.0.1", portlocal)
+	remote.NewRemote(sys, rconfig).Start()
 
 	pubsub.Init(ctx)
 
@@ -85,6 +109,12 @@ func main() {
 	}
 
 	//TODO: get id from hostname?
+
+	if len(id) > 0 {
+		utils.SetHostname(id)
+	}
+	id = utils.Hostname()
+	logs.LogBuild.Printf("ID: %s", id)
 	varSplit := strings.Split(id, "-")
 	if len(varSplit) < 1 {
 		id = "0001"
