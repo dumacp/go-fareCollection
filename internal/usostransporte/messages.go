@@ -15,3 +15,15 @@ type MsgSubscribe struct {
 }
 type MsgPublish struct{}
 type MsgGetInDB struct{}
+type MsgErrorDB struct {
+	Error string
+}
+type MsgVerifyDB struct {
+}
+type MsgOkDB struct {
+}
+type MsgRequestStatus struct {
+}
+type MsgStatus struct {
+	State bool
+}

@@ -2,6 +2,7 @@ package usostransporte
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -62,7 +63,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 		a.quit = make(chan int)
-		go tick(ctx, 60*time.Second, a.quit)
+		go tick(ctx, 30*time.Second, a.quit)
 
 	case *actor.Stopping:
 		close(a.quit)
@@ -82,14 +83,14 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			if resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, data); err != nil {
 				if a.db != nil {
-					ctx.Send(a.db, &database.MsgUpdateData{
+					ctx.Request(a.db, &database.MsgUpdateData{
 						Database:   databaseName,
 						Collection: collectionUsosData,
 						ID:         uso.ID,
 						Data:       data,
 					})
 				} else {
-					return fmt.Errorf("(db is empty) err post: %s, %w", resp, err)
+					return fmt.Errorf("(db is null) resp post: %s, err: %s, %w", resp, err, ErrorDB)
 				}
 				return fmt.Errorf("err post: %s, %w", resp, err)
 			} else {
@@ -99,6 +100,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}(); err != nil {
 			logstrans.LogError.Printf("send err: transaction with ID %s (payment ID = %s), err: %s",
 				msg.Data.ID, msg.Data.PaymentMediumId, err)
+			if errors.Is(err, ErrorDB) {
+				ctx.Send(ctx.Parent(), &MsgErrorDB{
+					Error: err.Error(),
+				})
+			}
 		}
 	case *MsgLock:
 		if err := func() error {
@@ -114,7 +120,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			if resp, err := utils.Post(a.httpClient, a.urlLock, a.userHttp, a.passHttp, data); err != nil {
 				if a.db != nil {
-					ctx.Send(a.db, &database.MsgUpdateData{
+					ctx.Request(a.db, &database.MsgUpdateData{
 						Database:   databaseName,
 						Collection: collectionLocksData,
 						ID:         uso.ID,
@@ -177,6 +183,32 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}(); err != nil {
 			logstrans.LogError.Printf("send err: transactionID with ID %s, err: %s", msg.ID, err)
 		}
+	case *database.MsgNoAckPersistData:
+		logstrans.LogError.Printf("error in DB, err: %s",
+			msg.Error)
+		ctx.Send(ctx.Parent(), &MsgErrorDB{
+			Error: msg.Error,
+		})
+	case *MsgVerifyDB:
+		if a.db != nil {
+			res, err := ctx.RequestFuture(a.db, &database.MsgUpdateData{
+				Database:   databaseName,
+				Collection: collectionUsosData,
+				ID:         "test",
+				Data:       []byte("test data"),
+			}, 1*time.Second).Result()
+			if err != nil {
+				logstrans.LogError.Printf("error in DB, err: %s",
+					err)
+				break
+			}
+			switch res.(type) {
+			case *database.MsgAckPersistData:
+				if ctx.Sender() != nil {
+					ctx.Respond(&MsgOkDB{})
+				}
+			}
+		}
 	}
 }
 
@@ -184,7 +216,7 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
-	t2 := time.After(3 * time.Second)
+	t2 := time.After(300 * time.Millisecond)
 	for {
 		select {
 		case <-t2:

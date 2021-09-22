@@ -3,161 +3,33 @@ package app
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
 
 	"github.com/dumacp/go-fareCollection/internal/business"
-	"github.com/dumacp/go-fareCollection/internal/buzzer"
 	"github.com/dumacp/go-fareCollection/internal/gps"
 	"github.com/dumacp/go-fareCollection/internal/graph"
 	"github.com/dumacp/go-fareCollection/internal/lists"
 	"github.com/dumacp/go-fareCollection/internal/lock"
 	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
-	"github.com/dumacp/go-fareCollection/internal/picto"
-	"github.com/dumacp/go-fareCollection/internal/pubsub"
 	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/internal/recharge"
 	"github.com/dumacp/go-fareCollection/internal/usostransporte"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
-	"github.com/dumacp/go-fareCollection/pkg/services"
 	"github.com/dumacp/go-logs/pkg/logs"
-	semessages "github.com/dumacp/go-sesam/pkg/messages"
-	"github.com/looplab/fsm"
 )
 
-type Actor struct {
-	behavior    actor.Behavior
-	deviceID    string
-	version     string
-	deviceIDnum int
-	// lastTag        uint64
-	// lastTimeDetect time.Time
-	// errorWriteTag  uint64
-	// actualTag      uint64
-	pidGraph  *actor.PID
-	pidBuzzer *actor.PID
-	pidPicto  *actor.PID
-	pidQR     *actor.PID
-	pidFare   *actor.PID
-	pidList   *actor.PID
-	pidGps    *actor.PID
-	pidUso    *actor.PID
-	pidParams *actor.PID
-	pidSam    *actor.PID
-	fmachine  *fsm.FSM
-	lastTime  time.Time
-	ctx       actor.Context
-	paym      map[uint64]payment.Payment
-	recharge  *recharge.Recharge
-	// rawcard   map[string]string
-	// updates        map[string]interface{}
-	// chNewRand  chan int
-	oldRand int
-	newRand int
-	inputs  int
-	outputs int
-	seq     int
-	// itineraryMap   itinerary.ItineraryMap
-	params          *parameters.Parameters
-	listRestrictive map[string]*lists.WatchList
-	timeout         int
-	lastWriteError  uint64
-	disableApp      bool
-	firtsBoot       bool
-	isReaderOk      bool
-	quit            chan int
-}
-
-func NewActor(id string, version string) actor.Actor {
-	a := &Actor{}
-	a.behavior = make(actor.Behavior, 0)
-	a.behavior.Become(a.InitState)
-	a.deviceID = id
-	a.version = version
-	varSplit := strings.Split(id, "-")
-	if len(varSplit) > 0 {
-		a.deviceIDnum, _ = strconv.Atoi(varSplit[len(varSplit)-1])
-	}
-	a.newFSM(nil)
-	go a.RunFSM()
-	return a
-}
-
-// var count = 0
-
-func (a *Actor) Receive(ctx actor.Context) {
+func (a *Actor) RunState(ctx actor.Context) {
 	a.ctx = ctx
 	logs.LogBuild.Printf("Message arrived in appActor: %s, %T, %s",
 		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
-	case *actor.Stopping:
-		logs.LogWarn.Printf("\"%s\" - Stopped actor, reason -> %v", ctx.Self(), msg)
-		a.writeerrorverify()
-		if a.pidParams != nil {
-			ctx.Send(a.pidParams, &parameters.AppParameters{
-				Seq:     uint(a.seq),
-				Inputs:  a.inputs,
-				Outputs: a.outputs,
-			})
-		}
 	case *actor.Started:
-		logs.LogInfo.Printf("started \"%s\", %v", ctx.Self().GetId(), ctx.Self())
-		if err := func() error {
-			propsBuzzer := actor.PropsFromProducer(buzzer.NewActor)
-			pidBuzzer, err := ctx.SpawnNamed(propsBuzzer, "buzzer-actor")
-			if err != nil {
-				time.Sleep(3 * time.Second)
-				return err
-			}
-			a.pidBuzzer = pidBuzzer
-			propsPicto := actor.PropsFromProducer(picto.NewActor)
-			pidPicto, err := ctx.SpawnNamed(propsPicto, "picto-actor")
-			if err != nil {
-				time.Sleep(3 * time.Second)
-				return err
-			}
-			a.pidPicto = pidPicto
-			propsQR := actor.PropsFromProducer(qr.NewActor)
-			pidQR, err := ctx.SpawnNamed(propsQR, "qr-actor")
-			if err != nil {
-				time.Sleep(3 * time.Second)
-				return err
-			}
-			a.pidQR = pidQR
-
-			pubsub.Subscribe(services.TopicAddress, ctx.Self(),
-				func(msg []byte) interface{} {
-					return &MsgReqAddress{Addr: string(msg)}
-				})
-			return nil
-		}(); err != nil {
-			logs.LogError.Println(err)
-			time.Sleep(3 * time.Second)
-			panic(err)
-		}
-		a.fmachine.Event(eStarted)
-		// ctx.Send(a.pidGraph, &graph.MsgWaitTag{})
-		a.quit = make(chan int)
-		go tick(ctx, 60*time.Minute, a.quit)
-	case *MsgWriteAppParams:
-		if a.pidParams != nil {
-			ctx.Send(a.pidParams, &parameters.AppParameters{
-				Seq:     uint(a.seq),
-				Inputs:  a.inputs,
-				Outputs: a.outputs,
-			})
-		}
-	case *parameters.ConfigParameters:
-		if a.pidParams != nil {
-			ctx.Send(a.pidParams, msg)
-		}
-		a.fmachine.Event(eOk, []string{"configuración", "datos actualizados"})
+		logs.LogInfo.Printf("started \"%s\", \"RunState\", %v", ctx.Self().GetId(), ctx.Self())
 	case *parameters.MsgParameters:
 		logstrans.LogInfo.Printf("params: %+v", msg.Data)
 		if ctx.Sender() != nil {
@@ -191,56 +63,17 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 		}
 		if a.pidGraph != nil {
-			if a.firtsBoot || a.isReaderOk {
-				a.firtsBoot = true
-				a.ctx.Send(a.pidGraph, &graph.MsgRef{
-					Device:  a.deviceID,
-					Version: a.version,
-					Ruta:    fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary),
-				})
-				a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.deviceIDnum})
-				a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
-			}
-			if !a.firtsBoot {
-				screen0 := &graph.Loading{
-					ID:      0,
-					Msg:     "app OK ...",
-					Percent: 85,
-				}
-				ctx.Send(a.pidGraph, screen0)
-				time.Sleep(1 * time.Second)
-				a.fmachine.Event(eWait)
-			}
-		}
-	case *lists.WatchList:
-		if a.listRestrictive == nil {
-			a.listRestrictive = make(map[string]*lists.WatchList)
-		}
-		a.listRestrictive[msg.ID] = msg
-		logstrans.LogInfo.Printf("watch over lists: %+v", a.listRestrictive)
-	case *MsgReqAddress:
+			a.ctx.Send(a.pidGraph, &graph.MsgRef{
+				Device:  a.deviceID,
+				Version: a.version,
+				Ruta:    fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary),
+			})
+			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.deviceIDnum})
+			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
 
-	case *messages.RegisterGraphActor:
-		a.pidGraph = actor.NewPID(msg.Addr, msg.Id)
-
-		screen0 := &graph.Loading{
-			ID:      0,
-			Msg:     "picto OK ...",
-			Percent: 90,
 		}
-		ctx.Send(a.pidGraph, screen0)
-	case *messages.RegisterFareActor:
-		a.pidFare = actor.NewPID(msg.Addr, msg.Id)
-	case *messages.RegisterListActor:
-		a.pidList = actor.NewPID(msg.Addr, msg.Id)
-	case *messages.RegisterGPSActor:
-		a.pidGps = actor.NewPID(msg.Addr, msg.Id)
-	case *messages.RegisterUSOActor:
-		a.pidUso = actor.NewPID(msg.Addr, msg.Id)
-	case *messages.RegisterSAMActor:
-		a.pidSam = actor.NewPID(msg.Addr, msg.Id)
-		ctx.Request(a.pidSam, &messages.MsgSERequestStatus{})
-
+	case *MsgWriteErrorVerify:
+		a.writeerrorverify()
 	case *usostransporte.UsoTransporte:
 		// logs.LogBuild.Printf("nodeID: [% X]", uuid.NodeID())
 		if len(msg.Coord) <= 0 {
@@ -624,59 +457,6 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(ctx.Self(), uso)
 		}()
 
-	case *qr.MsgNewCodeQR:
-		if err := func() error {
-			divInput := msg.Value[0:4]
-			revDiv := make([]byte, 0)
-			for i := range divInput {
-				revDiv = append(revDiv, divInput[len(divInput)-1-i])
-			}
-			iv := make([]byte, 0)
-			iv = append(iv, divInput...)
-			iv = append(iv, revDiv...)
-			iv = append(iv, divInput...)
-			iv = append(iv, revDiv...)
-			keySlot := 51
-			if a.params != nil && a.params.KeyQr > 0 {
-				keySlot = a.params.KeyQr
-			}
-			mdec := &semessages.MsgDecryptRequest{
-				Data:     msg.Value[4:],
-				DevInput: divInput[0:4],
-				IV:       iv,
-				//TODO: How to get ?
-				KeySlot: keySlot,
-			}
-			// logs.LogBuild.Printf("QR crypt: [% X], len: %d; [% X], len: %d",
-			// 	mdec.Data, len(mdec.Data), mdec.DevInput, len(mdec.DevInput))
-
-			var data []byte
-			samuid := ""
-
-			res, err := ctx.RequestFuture(a.pidSam, mdec, time.Millisecond*600).Result()
-			if err != nil {
-				return fmt.Errorf("get decrypt sam err: %w", err)
-			}
-			switch v := res.(type) {
-			case *semessages.MsgDecryptResponse:
-				if v.Plain == nil {
-					return errors.New("QR decrypt data is empty")
-				}
-				data = v.Plain
-				samuid = v.SamUID
-				logs.LogBuild.Printf("QR decrypt: %s, [%X]", data, data)
-			}
-
-			if ctx.Sender() != nil {
-				ctx.Respond(&qr.MsgResponseCodeQR{
-					Value:  data,
-					SamUid: samuid,
-				})
-			}
-			return nil
-		}(); err != nil {
-			logstrans.LogError.Printf("QR error: %s", err)
-		}
 	case *qr.MsgNewRand:
 		a.oldRand = a.newRand
 		a.newRand = msg.Value
@@ -690,47 +470,11 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(a.pidGraph, &graph.MsgQrValue{Value: v})
 		}
 	case *usostransporte.MsgErrorDB:
-		if !a.disableApp {
-			a.disableApp = true
-			a.fmachine.Event(eError, NewErrorScreen("error de sistema", "vuelva a ubicar la tarjeta"))
-		}
-	case *usostransporte.MsgOkDB:
-		a.disableApp = false
-		logstrans.LogInfo.Printf("usostransport DB ok")
+		a.disableApp = true
+		a.fmachine.Event(eError, NewErrorScreen("error de sistema", "vuelva a ubicar la tarjeta"))
 	case *messages.MsgSEError:
-		a.isReaderOk = false
-		if !a.disableApp {
-			a.disableApp = true
-			a.fmachine.Event(eError, NewErrorScreen("error de sistema", "Security Element error"))
-			logstrans.LogError.Printf("--- SE error, err: %s", msg.Error)
-		}
-	case *messages.MsgSEOK:
-		a.isReaderOk = true
-		logstrans.LogInfo.Printf("SE OK")
-		if !a.firtsBoot {
-			screen0 := &graph.Loading{
-				ID:      0,
-				Msg:     "app OK ...",
-				Percent: 99,
-			}
-			if a.params != nil {
-				a.firtsBoot = true
-				if a.pidGraph != nil {
-					ctx.Send(a.pidGraph, screen0)
-					time.Sleep(1 * time.Second)
-				}
-			} else {
-				if a.pidGraph != nil {
-					screen0.Msg = "params device is NOT ok ..."
-					screen0.Percent = 90
-					ctx.Send(a.pidGraph, screen0)
-					time.Sleep(1 * time.Second)
-				}
-			}
-		}
-		if a.params != nil {
-			a.disableApp = false
-			a.fmachine.Event(eWait)
-		}
+		a.disableApp = true
+		a.fmachine.Event(eError, NewErrorScreen("error de sistema", "Security Element error"))
+		logstrans.LogError.Printf("--- SE error, err: %s", msg.Error)
 	}
 }

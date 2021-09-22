@@ -13,3 +13,8 @@ type MsgGetInDB struct{}
 
 type MsgSubscribe struct{}
 type MsgPublish struct{}
+type MsgRequestStatus struct {
+}
+type MsgStatus struct {
+	State bool
+}

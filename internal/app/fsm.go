@@ -110,6 +110,10 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 			}
 			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
 		},
+		enterState(sStart): func(e *fsm.Event) {
+			a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+
+		},
 		enterState(sDetectTag): func(e *fsm.Event) {
 			// if e.Args != nil && len(e.Args) > 0 {
 			// 	switch v := e.Args[0].(type) {
@@ -129,7 +133,7 @@ func (a *Actor) newFSM(callbacks fsm.Callbacks) {
 				Message: "presente medio\r\nde pago",
 			}
 			if a.params != nil {
-				msg.Ruta = fmt.Sprintf("%d", a.params.PaymentItinerary)
+				msg.Ruta = fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary)
 			}
 
 			a.ctx.Send(a.pidGraph, msg)
@@ -219,8 +223,10 @@ func (a *Actor) RunFSM() {
 
 				switch f.Current() {
 				case sStart:
-					a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
-					f.Event(eWait)
+					// a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
+					if a.firtsBoot {
+						f.Event(eWait)
+					}
 				case sDetectTag:
 				case sValidationCard:
 					if time.Now().Add(-time.Duration(a.timeout) * time.Millisecond).After(a.lastTime) {

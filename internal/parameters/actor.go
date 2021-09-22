@@ -15,23 +15,23 @@ import (
 )
 
 const (
-	defaultURL = "%s/api/external-system-gateway/rest/dev-summary"
-	// paymentMediumURL   = "%s/api/external-system-gateway/rest/payment-medium-types/"
-	defaultUsername    = "dev.nebulae"
-	filterHttpQuery    = "?page=%d&count=%d&active=true"
-	defaultPassword    = "uno.2.tres"
-	dbpath             = "/SD/boltdb/parametersdb"
-	databaseName       = "parametersdb"
-	collectionNameData = "parameters"
+	defaultURL                   = "%s/api/external-system-gateway/rest/dev-summary"
+	paymentMediumURL             = "%s/api/external-system-gateway/rest/payment-medium-types/"
+	defaultUsername              = "dev.nebulae"
+	filterHttpQuery              = "?page=%d&count=%d&active=true"
+	defaultPassword              = "uno.2.tres"
+	dbpath                       = "/SD/boltdb/parametersdb"
+	databaseName                 = "parametersdb"
+	collectionNameData           = "parameters"
+	collectionPaymentMediumsData = "Mediums"
 )
 
 type Actor struct {
-	quit       chan int
-	httpClient *http.Client
-	userHttp   string
-	passHttp   string
-	url        string
-	// mediumUrl          string
+	quit               chan int
+	httpClient         *http.Client
+	userHttp           string
+	passHttp           string
+	url                string
 	id                 string
 	db                 *actor.PID
 	evs                *eventstream.EventStream
@@ -83,7 +83,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 
 		a.quit = make(chan int)
-		go tick(ctx, 15*time.Minute, a.quit)
+		go tick(ctx, 20*time.Minute, a.quit)
 
 	case *actor.Stopping:
 		close(a.quit)
@@ -96,7 +96,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		subscribe(ctx, a.evs)
 
 		if a.parameters != nil && ctx.Sender() != nil {
-			ctx.Respond(&MsgParameters{Data: a.parameters})
+			ctx.Request(ctx.Sender(), &MsgParameters{Data: a.parameters})
 		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetParameters{})
@@ -201,6 +201,13 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 			}(); err != nil {
 				logs.LogError.Println(err)
+				go func() {
+					if a.parameters == nil {
+						time.Sleep(30 * time.Second)
+						ctx.Send(ctx.Self(), &MsgGetParameters{})
+					}
+				}()
+				return
 			}
 			if isUpdateMap {
 				logs.LogBuild.Printf("params: %+v", a.parameters)
@@ -241,6 +248,15 @@ func (a *Actor) Receive(ctx actor.Context) {
 				a.parameters = param
 			}
 		}
+	case *MsgRequestStatus:
+		if ctx.Sender() != nil {
+			break
+		}
+		if a.parameters != nil {
+			ctx.Respond(&MsgStatus{State: true})
+		} else {
+			ctx.Respond(&MsgStatus{State: false})
+		}
 	}
 }
 
@@ -248,8 +264,9 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
-	t2 := time.After(3 * time.Second)
-	t3 := time.After(2 * time.Second)
+	defer t1.Stop()
+	t2 := time.After(400 * time.Millisecond)
+	t3 := time.After(300 * time.Millisecond)
 	for {
 		select {
 		case <-t3:

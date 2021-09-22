@@ -5,9 +5,12 @@ import (
 	"time"
 
 	"github.com/AsynkronIT/protoactor-go/actor"
+	"github.com/dumacp/go-fareCollection/internal/utils"
 )
 
 func TestNewActor(t *testing.T) {
+
+	utils.Url = "https://sibus.nebulae.com.co"
 	sys := actor.NewActorSystem()
 
 	rootctx := sys.Root
@@ -56,7 +59,7 @@ func TestNewActor(t *testing.T) {
 				t.Logf("result: %#v", res)
 
 			}
-			time.Sleep(10 * time.Second)
+			time.Sleep(80 * time.Second)
 		})
 	}
 }

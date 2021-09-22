@@ -130,7 +130,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 					for k, v := range a.farePolicies {
 						if _, ok := actives[k]; !ok {
 							ctx.Send(a.db, &database.MsgDeleteData{
-								ID:         v.FarePolicyID,
+								ID:         fmt.Sprintf("%s:%d", v.FarePolicyID, v.ID),
 								Database:   databaseName,
 								Collection: collectionNameData,
 							})
@@ -256,6 +256,15 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.fareMap = CreateTree(a.farePolicies)
 		}
 		logs.LogBuild.Printf("fare map: %#v", a.fareMap)
+	case *MsgRequestStatus:
+		if ctx.Sender() != nil {
+			break
+		}
+		if len(a.farePolicies) > 0 {
+			ctx.Respond(&MsgStatus{State: true})
+		} else {
+			ctx.Respond(&MsgStatus{State: false})
+		}
 	}
 }
 
@@ -263,8 +272,8 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
-	t2 := time.After(3 * time.Second)
-	t3 := time.After(2 * time.Second)
+	t2 := time.After(400 * time.Millisecond)
+	t3 := time.After(300 * time.Millisecond)
 	for {
 		select {
 		case <-t3:

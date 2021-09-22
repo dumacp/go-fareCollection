@@ -15,6 +15,8 @@ const (
 
 type Actor struct {
 	inputs int
+	//TODO: remove
+	loadingPercent int
 }
 
 func NewActor() actor.Actor {
@@ -28,8 +30,27 @@ func (a *Actor) Receive(ctx actor.Context) {
 		// if err := pubsub.Init(); err != nil {
 		// 	logs.LogError.Println(err)
 		time.Sleep(3 * time.Second)
-		// 	panic(err)
-		// }
+	// 	panic(err)
+	// }
+	case *Loading:
+		percent := msg.Percent
+		if msg.Percent > 0 {
+			a.loadingPercent = msg.Percent
+		} else {
+			percent = a.loadingPercent
+		}
+		screen0 := &Loading{
+			ID:      0,
+			Msg:     msg.Msg,
+			Percent: percent,
+			// Msg: []string{"presente medio\r\nde pago", msg.Ruta},
+		}
+		sendMsg0, err := funScreen(screen0)
+		if err != nil {
+			logs.LogWarn.Println(err)
+			break
+		}
+		pubsub.Publish(topicGraph, sendMsg0)
 	case *MsgWaitTag:
 		screen1 := &Screen{
 			ID:  1,

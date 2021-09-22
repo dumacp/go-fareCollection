@@ -66,7 +66,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		a.quit = make(chan int)
 		//TODO: change delay
-		go tick(ctx, 2*time.Minute, a.quit)
+		go tick(ctx, 30*time.Minute, a.quit)
 		//TODO:
 		// get http parameters
 	case *actor.Stopping:
@@ -264,6 +264,15 @@ func (a *Actor) Receive(ctx actor.Context) {
 			Populate(list)
 			a.listMap[list.Code] = list
 		}(ctx)
+	case *MsgRequestStatus:
+		if ctx.Sender() != nil {
+			break
+		}
+		if len(a.listMap) > 0 {
+			ctx.Respond(&MsgStatus{State: true})
+		} else {
+			ctx.Respond(&MsgStatus{State: false})
+		}
 	}
 }
 
@@ -271,8 +280,8 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
-	t2 := time.After(3 * time.Second)
-	t3 := time.After(2 * time.Second)
+	t2 := time.After(400 * time.Millisecond)
+	t3 := time.After(300 * time.Millisecond)
 	for {
 		select {
 		case <-t3:

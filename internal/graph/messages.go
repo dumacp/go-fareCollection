@@ -35,3 +35,8 @@ type MsgRef struct {
 type MsgCount struct {
 	Value int
 }
+
+type MsgLoading struct {
+	Msg   string
+	Value int
+}

@@ -21,8 +21,10 @@ import (
 	"github.com/dumacp/go-fareCollection/internal/app"
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/gps"
+	"github.com/dumacp/go-fareCollection/internal/graph"
 	"github.com/dumacp/go-fareCollection/internal/itinerary"
 	"github.com/dumacp/go-fareCollection/internal/lists"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/pubsub"
 	"github.com/dumacp/go-fareCollection/internal/usostransporte"
@@ -66,7 +68,6 @@ func main() {
 	logs.LogBuild.Println("debug log")
 
 	sys := actor.NewActorSystem()
-	ctx := sys.Root
 
 	portlocal := 8009
 	for {
@@ -77,15 +78,39 @@ func main() {
 		if err != nil {
 			break
 		}
-		logs.LogWarn.Printf("socket busy -> \"%s\"", socket)
 		testConn.Close()
+		logs.LogWarn.Printf("socket busy -> \"%s\"", socket)
 		time.Sleep(1 * time.Second)
 	}
 
-	rconfig := remote.Configure("127.0.0.1", portlocal)
-	remote.NewRemote(sys, rconfig).Start()
+	rconfig := remote.Configure("127.0.0.1", portlocal).WithServerOptions()
+	r := remote.NewRemote(sys, rconfig)
+	r.Start()
+
+	// decider := func(reason interface{}) actor.Directive {
+	// 	fmt.Println("handling failure for child")
+	// 	return actor.StopDirective
+	// }
+	// supervisor := actor.NewOneForOneStrategy(10, 1000, decider)
+
+	// ctx := sys.Root.WithGuardian(supervisor)
+	ctx := sys.Root
 
 	pubsub.Init(ctx)
+
+	propsGrpah := actor.PropsFromProducer(graph.NewActor)
+	pidGrpah, err := ctx.SpawnNamed(propsGrpah, "graph-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
+
+	screen0 := &graph.Loading{
+		ID:      0,
+		Msg:     "graph OK ...",
+		Percent: 5,
+	}
+
+	ctx.Send(pidGrpah, screen0)
 
 	propsGps := actor.PropsFromProducer(gps.NewActor)
 
@@ -94,11 +119,30 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
+	time.Sleep(1 * time.Second)
+
+	screen0 = &graph.Loading{
+		ID:      0,
+		Msg:     "gps OK ...",
+		Percent: 10,
+	}
+
+	ctx.Send(pidGrpah, screen0)
+
 	propsFare := actor.PropsFromProducer(fare.NewActor).WithMailbox(mailbox.UnboundedPriority())
 	pidFare, err := ctx.SpawnNamed(propsFare, "fare-actor")
 	if err != nil {
 		logs.LogError.Fatalln(err)
 	}
+
+	time.Sleep(1 * time.Second)
+
+	screen0 = &graph.Loading{
+		ID:      0,
+		Msg:     "fare policies OK ...",
+		Percent: 20,
+	}
+	ctx.Send(pidGrpah, screen0)
 
 	itiActor := itinerary.NewActor()
 	propsIti := actor.PropsFromFunc(itiActor.Receive)
@@ -107,6 +151,15 @@ func main() {
 	if err != nil {
 		logs.LogError.Fatalln(err)
 	}
+
+	time.Sleep(2 * time.Second)
+
+	screen0 = &graph.Loading{
+		ID:      0,
+		Msg:     "itineraries map OK ...",
+		Percent: 40,
+	}
+	ctx.Send(pidGrpah, screen0)
 
 	//TODO: get id from hostname?
 
@@ -135,6 +188,15 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
+	time.Sleep(2 * time.Second)
+
+	screen0 = &graph.Loading{
+		ID:      0,
+		Msg:     "parameters OK ...",
+		Percent: 60,
+	}
+	ctx.Send(pidGrpah, screen0)
+
 	propsList := actor.PropsFromProducer(lists.NewActor).WithMailbox(mailbox.UnboundedPriority())
 
 	pidList, err := ctx.SpawnNamed(propsList, "list-actor")
@@ -142,12 +204,30 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
+	time.Sleep(1 * time.Second)
+
+	screen0 = &graph.Loading{
+		ID:      0,
+		Msg:     "lists OK ...",
+		Percent: 70,
+	}
+	ctx.Send(pidGrpah, screen0)
+
 	propsUsos := actor.PropsFromProducer(usostransporte.NewActor)
 
 	pidUsos, err := ctx.SpawnNamed(propsUsos, "usos-actor")
 	if err != nil {
 		logs.LogError.Fatalln(err)
 	}
+
+	time.Sleep(2 * time.Second)
+
+	screen0 = &graph.Loading{
+		ID:      0,
+		Msg:     "usos databases OK ...",
+		Percent: 80,
+	}
+	ctx.Send(pidGrpah, screen0)
 
 	appActor := app.NewActor(id, version)
 	propsApp := actor.PropsFromFunc(appActor.Receive)
@@ -163,7 +243,8 @@ func main() {
 		exec.Command("/bin/sh", "-c", "echo 0 > /sys/class/leds/enable-reader/brightness").Run()
 		time.Sleep(1 * time.Second)
 		if res, err := exec.Command("/bin/sh", "-c", "echo 1 > /sys/class/leds/enable-reader/brightness").CombinedOutput(); err != nil {
-			log.Printf("%s, err: %s", res, err)
+			logs.LogError.Printf("%s, err: %s", res, err)
+			logstrans.LogError.Printf("%s, err: %s", res, err)
 		}
 		time.Sleep(1 * time.Second)
 
@@ -188,8 +269,11 @@ func main() {
 		logs.LogError.Fatalln(err)
 	}
 
+	time.Sleep(6 * time.Second)
+
 	readerActor.Subscribe(pidApp)
 
+	ctx.Send(pidApp, &messages.RegisterGraphActor{Addr: pidGrpah.Address, Id: pidGrpah.Id})
 	ctx.Send(pidApp, &messages.RegisterGPSActor{Addr: pidGps.Address, Id: pidGps.Id})
 	ctx.Send(pidApp, &messages.RegisterFareActor{Addr: pidFare.Address, Id: pidFare.Id})
 	ctx.Send(pidApp, &messages.RegisterListActor{Addr: pidList.Address, Id: pidList.Id})

@@ -16,6 +16,12 @@ type Screen struct {
 	Msg []string `json:"msg"`
 }
 
+type Loading struct {
+	ID      int    `json:"id"`
+	Msg     string `json:"msg"`
+	Percent int    `json:"percent"`
+}
+
 //Countinputs value type for type inputs
 type Countinputs struct {
 	Count int `json:"count"`

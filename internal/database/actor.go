@@ -194,6 +194,10 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 				a.fm.Event(eError)
 			case errors.Is(err, bbolt.ErrDatabaseOpen):
 				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrDatabaseReadOnly):
+				a.fm.Event(eError)
+			case errors.Is(err, bbolt.ErrTxNotWritable):
+				a.fm.Event(eError)
 			}
 		}
 

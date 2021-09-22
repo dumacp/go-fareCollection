@@ -26,13 +26,22 @@ func RechargeQR(paym payment.Payment,
 	}
 
 	lasth := paym.Recharged()
-	tt := time.Now()
+	// tt := time.Now()
 	if len(lasth) > 0 {
-		tt = lasth[len(lasth)-1].TimeTransaction()
+		// tt = lasth[0].TimeTransaction()
+		for _, v := range lasth {
+			if v.TimeTransaction().Before(time.Unix(969307158, 0)) {
+				continue
+			}
+			if v.TimeTransaction().After(data.Date) {
+				return nil, errors.New("recarga ya no es válida")
+			}
+			break
+		}
 	}
-	if tt.After(data.Date) {
-		return nil, errors.New("recarga ya no es válida")
-	}
+	// if tt.After(data.Date) {
+	// 	return nil, errors.New("recarga ya no es válida")
+	// }
 
 	//TODO: where get this param
 	ttype := 2

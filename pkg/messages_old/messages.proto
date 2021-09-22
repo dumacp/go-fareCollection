@@ -1,10 +1,8 @@
 syntax = "proto3";
 package messages;
-
-// import "protos.proto";
 // import "github.com/AsynkronIT/protoactor-go/actor/protos.proto";
 // import "google/protobuf/any.proto";
-// option go_package = "github.com/dumacp/go-fareCollection";
+option go_package = "github.com/dumacp/go-fareCollection/pkg/messages";
 
 
 message Value {
@@ -71,14 +69,6 @@ message RegisterSAMActor{
 	string addr = 1;
    string id = 2;
 }
-message RegisterPictoActor{
-	string addr = 1;
-   string id = 2;
-}
-message RegisterGraphActor{
-	string addr = 1;
-   string id = 2;
-}
 
 message Decrypt {
 	bytes Data = 1;
@@ -86,14 +76,4 @@ message Decrypt {
 }
 message DecryptResponse {
 	bytes Data = 1;
-}
-
-message MsgSEError{
-   string error = 1;
-}
-message MsgSEOK{
-   string addr =1;
-}
-message MsgSERequestStatus{
-   string addr =1;
 }

@@ -37,6 +37,8 @@ func parseEvents(msg []byte) interface{} {
 
 //Receive func Receive in actor
 func (a *Actor) Receive(ctx actor.Context) {
+	logs.LogBuild.Printf("Message arrived in gpsActor: %s, %T, %s",
+		ctx.Message(), ctx.Message(), ctx.Sender())
 	a.ctx = ctx
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
@@ -80,5 +82,10 @@ func (a *Actor) Receive(ctx actor.Context) {
 				ctx.Respond(&MsgGPS{Data: nil})
 			}
 		}
+	case *MsgRequestStatus:
+		if ctx.Sender() != nil {
+			break
+		}
+		ctx.Respond(&MsgStatus{State: true})
 	}
 }

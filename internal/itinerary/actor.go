@@ -94,7 +94,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 		subscribe(ctx, a.evs)
 		if a.itineraryMap != nil && ctx.Sender() != nil {
-			ctx.Respond(&MsgMap{Data: a.itineraryMap})
+			ctx.Request(ctx.Sender(), &MsgMap{Data: a.itineraryMap})
 		}
 	case *MsgTick:
 		ctx.Send(ctx.Self(), &MsgGetModes{})
@@ -280,6 +280,15 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}
 			a.itineraryMap[iti.PaymentMediumCode] = iti
 		}
+	case *MsgRequestStatus:
+		if ctx.Sender() != nil {
+			break
+		}
+		if len(a.itineraryMap) > 0 {
+			ctx.Respond(&MsgStatus{State: true})
+		} else {
+			ctx.Respond(&MsgStatus{State: false})
+		}
 	}
 }
 
@@ -287,8 +296,8 @@ func tick(ctx actor.Context, timeout time.Duration, quit <-chan int) {
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
 	t1 := time.NewTicker(timeout)
-	t2 := time.After(3 * time.Second)
-	t3 := time.After(2 * time.Second)
+	t2 := time.After(400 * time.Millisecond)
+	t3 := time.After(300 * time.Millisecond)
 	for {
 		select {
 		case <-t3:

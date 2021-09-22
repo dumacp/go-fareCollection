@@ -118,6 +118,8 @@ func (ps *pubsubActor) subscribe(topic string, subs *subscribeMSG) error {
 
 //Receive function
 func (ps *pubsubActor) Receive(ctx actor.Context) {
+	logs.LogBuild.Printf("Message arrived in pubsubActor: %s, %T, %s",
+		ctx.Message(), ctx.Message(), ctx.Sender())
 	ps.ctx = ctx
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:

@@ -32,3 +32,8 @@ type MsgVerifyInListResponse struct {
 	ListID string
 	ID     []int64
 }
+type MsgRequestStatus struct {
+}
+type MsgStatus struct {
+	State bool
+}

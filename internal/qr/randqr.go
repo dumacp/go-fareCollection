@@ -35,10 +35,10 @@ type QrCode struct {
 
 func tickQR(ctx actor.Context, ch <-chan int) {
 
-	timeout := 120 * time.Second
+	timeout := 80 * time.Second
 	rootctx := ctx.ActorSystem().Root
 	self := ctx.Self()
-	t1 := time.NewTimer(5 * time.Second)
+	t1 := time.NewTimer(20 * time.Second)
 	defer t1.Stop()
 
 	for {

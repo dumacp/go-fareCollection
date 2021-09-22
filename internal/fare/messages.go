@@ -27,3 +27,9 @@ type MsgError struct {
 type MsgTick struct{}
 
 type MsgGetFareInDB struct{}
+
+type MsgRequestStatus struct {
+}
+type MsgStatus struct {
+	State bool
+}

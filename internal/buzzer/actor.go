@@ -15,6 +15,8 @@ func NewActor() actor.Actor {
 }
 
 func (a *Actor) Receive(ctx actor.Context) {
+	logs.LogBuild.Printf("Message arrived in buzzerActor: %s, %T, %s",
+		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch ctx.Message().(type) {
 
 	case *actor.Started:

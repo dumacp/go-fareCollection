@@ -15,3 +15,8 @@ type MsgGpsRaw struct {
 type MsgGetGps struct{}
 
 type MsgSubscribe struct{}
+type MsgRequestStatus struct {
+}
+type MsgStatus struct {
+	State bool
+}
