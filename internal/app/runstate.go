@@ -25,8 +25,6 @@ import (
 
 func (a *Actor) RunState(ctx actor.Context) {
 	a.ctx = ctx
-	logs.LogBuild.Printf("Message arrived in appActor: %s, %T, %s",
-		ctx.Message(), ctx.Message(), ctx.Sender())
 	switch msg := ctx.Message().(type) {
 	case *actor.Started:
 		logs.LogInfo.Printf("started \"%s\", \"RunState\", %v", ctx.Self().GetId(), ctx.Self())
@@ -55,20 +53,12 @@ func (a *Actor) RunState(ctx actor.Context) {
 				ctx.Request(a.pidList, &lists.MsgWatchList{ID: list})
 			}
 		}
-		if a.disableApp {
-			if a.isReaderOk {
-				a.disableApp = false
-			} else {
-				break
-			}
-		}
 		if a.pidGraph != nil {
 			a.ctx.Send(a.pidGraph, &graph.MsgRef{
 				Device:  a.deviceID,
 				Version: a.version,
 				Ruta:    fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary),
 			})
-			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.deviceIDnum})
 			a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
 
 		}
@@ -134,15 +124,15 @@ func (a *Actor) RunState(ctx actor.Context) {
 		a.recharge.Seq = a.seq + 1
 		a.recharge.DeviceID = a.deviceIDnum
 	case *messages.MsgPayment:
-		if a.disableApp {
-			a.fmachine.Event(eError, NewErrorScreen("error de sistema", "vuelva a ubicar la tarjeta"))
-		}
+		// if a.disableApp {
+		// 	a.fmachine.Event(eError, NewErrorScreen("error de sistema", "vuelva a ubicar la tarjeta"))
+		// }
 		var paym payment.Payment
 		if a.paym == nil {
 			a.paym = make(map[uint64]payment.Payment)
 		}
 		updates, err := func() (map[string]interface{}, error) {
-			logstrans.LogInfo.Printf("detect uid: %d", msg.Uid)
+			logstrans.LogBuild.Printf("detect uid: %d", msg.Uid)
 			var err error
 			paym, err = business.ParsePayment(msg)
 			if err != nil {
@@ -470,11 +460,14 @@ func (a *Actor) RunState(ctx actor.Context) {
 			ctx.Send(a.pidGraph, &graph.MsgQrValue{Value: v})
 		}
 	case *usostransporte.MsgErrorDB:
-		a.disableApp = true
-		a.fmachine.Event(eError, NewErrorScreen("error de sistema", "vuelva a ubicar la tarjeta"))
+		a.fmachine.Event(eError, NewErrorScreen("error de sistema", "base de datos local error"))
+		a.behavior.Become(a.AwaitState)
 	case *messages.MsgSEError:
-		a.disableApp = true
 		a.fmachine.Event(eError, NewErrorScreen("error de sistema", "Security Element error"))
 		logstrans.LogError.Printf("--- SE error, err: %s", msg.Error)
+		a.behavior.Become(a.AwaitState)
+		if a.pidUso != nil {
+			ctx.Request(a.pidUso, &usostransporte.MsgVerifyDB{})
+		}
 	}
 }

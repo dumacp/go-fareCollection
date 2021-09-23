@@ -223,10 +223,15 @@ func (a *Actor) RunFSM() {
 
 				switch f.Current() {
 				case sStart:
-					// a.ctx.Send(a.pidBuzzer, &buzzer.MsgBuzzerGood{})
-					if a.firtsBoot {
-						f.Event(eWait)
+					if a.params != nil && a.pidGraph != nil {
+						a.ctx.Send(a.pidGraph, &graph.MsgRef{
+							Device:  a.deviceID,
+							Version: a.version,
+							Ruta:    fmt.Sprintf("Ruta: %d", a.params.PaymentItinerary),
+						})
+						a.ctx.Send(a.pidGraph, &graph.MsgCount{Value: a.inputs})
 					}
+					f.Event(eWait)
 				case sDetectTag:
 				case sValidationCard:
 					if time.Now().Add(-time.Duration(a.timeout) * time.Millisecond).After(a.lastTime) {

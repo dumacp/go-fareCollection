@@ -17,37 +17,31 @@ import (
 
 func (a *Actor) InitState(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
-	case *actor.Stopping:
-		logs.LogWarn.Printf("\"%s\" - Stopped actor, reason -> %v", ctx.Self(), msg)
-		ctx.Send(ctx.Self(), &MsgWriteAppParams{})
-		ctx.Send(ctx.Self(), &MsgWriteErrorVerify{})
 	case *actor.Started:
-		logs.LogInfo.Printf("started \"%s\", \"RunSate\", %v", ctx.Self().GetId(), ctx.Self())
+		logs.LogInfo.Printf("started \"%s\", \"InitSate\", %v", ctx.Self().GetId(), ctx.Self())
 	case *parameters.MsgParameters:
-		if a.isReaderOk {
-			a.fmachine.Event(eWait)
-			a.behavior.Become(a.RunState)
-		}
 		if a.pidGraph != nil {
 			screen0 := &graph.Loading{
 				ID:      0,
 				Msg:     "app params OK ...",
-				Percent: 85,
+				Percent: 90,
 			}
 			ctx.Send(a.pidGraph, screen0)
 			time.Sleep(1 * time.Second)
-			a.fmachine.Event(eWait)
 		}
-	case *MsgReqAddress:
+		if a.isReaderOk {
+			a.fmachine.Event(eStarted)
+			a.behavior.Become(a.RunState)
+		}
 	case *messages.RegisterGraphActor:
-		a.pidGraph = actor.NewPID(msg.Addr, msg.Id)
-
 		screen0 := &graph.Loading{
 			ID:      0,
 			Msg:     "picto OK ...",
 			Percent: 90,
 		}
 		ctx.Send(a.pidGraph, screen0)
+	case *MsgReqAddress:
+
 	case *parameters.MsgStatus:
 		if !msg.State {
 			if a.pidGraph != nil {
@@ -66,12 +60,11 @@ func (a *Actor) InitState(ctx actor.Context) {
 			}
 		} else {
 			if a.isReaderOk {
-				a.fmachine.Event(eWait)
+				a.fmachine.Event(eStarted)
 				a.behavior.Become(a.RunState)
 			}
 		}
 	case *usostransporte.MsgOkDB:
-		a.disableApp = false
 		logstrans.LogInfo.Printf("usostransport DB ok")
 		if a.pidGraph != nil {
 			screen0 := &graph.Loading{
@@ -79,8 +72,29 @@ func (a *Actor) InitState(ctx actor.Context) {
 				Msg:     "app db OK ...",
 				Percent: -1,
 			}
+			time.Sleep(1 * time.Second)
 			ctx.Send(a.pidGraph, screen0)
 		}
+		if a.params != nil && a.isReaderOk {
+			a.behavior.Become(a.RunState)
+			a.fmachine.Event(eStarted)
+		}
+	case *usostransporte.MsgErrorDB:
+		logstrans.LogInfo.Printf("usostransport DB is NOT ok")
+		if a.pidGraph != nil {
+			screen0 := &graph.Loading{
+				ID:      0,
+				Msg:     "app db is NOT ok ...",
+				Percent: -1,
+			}
+			ctx.Send(a.pidGraph, screen0)
+		}
+		go func() {
+			if a.pidUso != nil {
+				time.Sleep(20 * time.Second)
+				ctx.Send(a.pidUso, &usostransporte.MsgVerifyDB{})
+			}
+		}()
 	case *messages.MsgSEError:
 		a.isReaderOk = false
 		logstrans.LogError.Printf("--- SE error, err: %s", msg.Error)
@@ -92,6 +106,12 @@ func (a *Actor) InitState(ctx actor.Context) {
 			}
 			ctx.Send(a.pidGraph, screen0)
 		}
+		go func() {
+			time.Sleep(5 * time.Second)
+			if a.pidSam != nil {
+				ctx.Request(a.pidSam, &messages.MsgSERequestStatus{})
+			}
+		}()
 	case *messages.MsgSEOK:
 		a.isReaderOk = true
 		logstrans.LogInfo.Printf("SE OK")
@@ -106,12 +126,15 @@ func (a *Actor) InitState(ctx actor.Context) {
 				time.Sleep(1 * time.Second)
 			}
 		} else {
-			if a.pidParams != nil {
-				ctx.Send(a.pidParams, &parameters.MsgRequestStatus{})
-			}
+			go func() {
+				if a.pidParams != nil {
+					time.Sleep(30 * time.Second)
+					ctx.Send(a.pidParams, &parameters.MsgRequestStatus{})
+				}
+			}()
 		}
 		if a.params != nil {
-			a.fmachine.Event(eWait)
+			a.fmachine.Event(eStarted)
 			a.behavior.Become(a.RunState)
 		}
 	}

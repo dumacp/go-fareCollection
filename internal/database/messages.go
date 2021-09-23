@@ -3,6 +3,7 @@ package database
 type MsgOpenDB struct{}
 type MsgOpenedDB struct{}
 type MsgCloseDB struct{}
+type MsgErrorDB struct{}
 type MsgUpdateData struct {
 	ID         string
 	Data       []byte

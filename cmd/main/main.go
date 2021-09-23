@@ -229,24 +229,20 @@ func main() {
 	}
 	ctx.Send(pidGrpah, screen0)
 
-	appActor := app.NewActor(id, version)
-	propsApp := actor.PropsFromFunc(appActor.Receive)
-
-	pidApp, err := ctx.SpawnNamed(propsApp, "app-actor")
-	if err != nil {
-		logs.LogError.Fatalln(err)
-	}
-
 	// init contactless reader
 	var dev *multiiso.Device
+	// firsboot := true
 	funcReader := func() smartcard.IReader {
+		// if !firsboot {
+		// 	firsboot = false
 		exec.Command("/bin/sh", "-c", "echo 0 > /sys/class/leds/enable-reader/brightness").Run()
 		time.Sleep(1 * time.Second)
+		// }
 		if res, err := exec.Command("/bin/sh", "-c", "echo 1 > /sys/class/leds/enable-reader/brightness").CombinedOutput(); err != nil {
 			logs.LogError.Printf("%s, err: %s", res, err)
 			logstrans.LogError.Printf("%s, err: %s", res, err)
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		dev, err = multiiso.NewDevice(serial, baud, time.Millisecond*600)
 		if err != nil {
@@ -270,6 +266,14 @@ func main() {
 	}
 
 	time.Sleep(6 * time.Second)
+
+	appActor := app.NewActor(id, version)
+	propsApp := actor.PropsFromFunc(appActor.Receive)
+
+	pidApp, err := ctx.SpawnNamed(propsApp, "app-actor")
+	if err != nil {
+		logs.LogError.Fatalln(err)
+	}
 
 	readerActor.Subscribe(pidApp)
 

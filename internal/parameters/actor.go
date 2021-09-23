@@ -256,6 +256,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Respond(&MsgStatus{State: true})
 		} else {
 			ctx.Respond(&MsgStatus{State: false})
+			// ctx.Send(ctx.Self(), &MsgGetParameters{})
 		}
 	}
 }

@@ -74,6 +74,10 @@ func Open(ctx *actor.RootContext, pathdb string) (DB, error) {
 	instance := &dbActor{}
 	instance.pathDB = pathdb
 
+	instance.behavior = make(actor.Behavior, 0)
+	instance.behavior.Become(instance.CloseState)
+	instance.fm = instance.initFSM()
+
 	props := actor.PropsFromFunc(instance.Receive)
 
 	if ctx == nil {
@@ -87,10 +91,7 @@ func Open(ctx *actor.RootContext, pathdb string) (DB, error) {
 	}
 	instance.pid = pid
 
-	instance.behavior = make(actor.Behavior, 0)
-	instance.behavior.Become(instance.CloseState)
-	instance.initFSM()
-
+	// time.Sleep(1 * time.Second)
 	return instance, nil
 }
 
@@ -101,10 +102,12 @@ func (a *dbActor) Receive(ctx actor.Context) {
 }
 
 func (a *dbActor) CloseState(ctx actor.Context) {
-	logs.LogBuild.Printf("Message arrive in datab (CloseState): %s, %T", ctx.Message(), ctx.Message())
+	logs.LogBuild.Printf("Message arrive in datab (CloseState): %s, %T, %s", ctx.Message(), ctx.Message(), ctx.Sender())
 	switch ctx.Message().(type) {
 	case *actor.Started:
 		a.fm.Event(eOpenCmd)
+	case *MsgErrorDB:
+		a.fm.Event(eError)
 	case *MsgOpenDB:
 		a.fm.Event(eOpenCmd)
 		if ctx.Sender() != nil {
@@ -123,6 +126,8 @@ func (a *dbActor) WaitState(ctx actor.Context) {
 		if ctx.Sender() != nil {
 			ctx.Respond(&MsgOpenDB{})
 		}
+	case *MsgErrorDB:
+		a.fm.Event(eError)
 	case *MsgInsertData:
 
 		if err := func() error {
