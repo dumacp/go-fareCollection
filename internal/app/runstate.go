@@ -46,7 +46,7 @@ func (a *Actor) RunState(ctx actor.Context) {
 			a.outputs = int(a.params.Outputs)
 		}
 		if a.params.DevSerial > 0 {
-			a.deviceIDnum = a.params.DevSerial
+			a.deviceSerial = a.params.DevSerial
 		}
 		if a.pidList != nil {
 			for _, list := range a.params.RestrictiveList {
@@ -122,7 +122,7 @@ func (a *Actor) RunState(ctx actor.Context) {
 		a.fmachine.Event(eOk, []string{"ticket de recarga", fmt.Sprintf("(%d) ubique la tarjeta", msg.Value)})
 		a.recharge = msg
 		a.recharge.Seq = a.seq + 1
-		a.recharge.DeviceID = a.deviceIDnum
+		a.recharge.DeviceID = a.deviceSerial
 	case *messages.MsgPayment:
 		// if a.disableApp {
 		// 	a.fmachine.Event(eError, NewErrorScreen("error de sistema", "vuelva a ubicar la tarjeta"))
@@ -216,7 +216,7 @@ func (a *Actor) RunState(ctx actor.Context) {
 						return nil, NewErrorScreen("error recarga", err.Error())
 					}
 				}
-				updates, err := business.CalcUpdatesWithFare(ctx, a.pidFare, a.deviceIDnum, paym, a.params)
+				updates, err := business.CalcUpdatesWithFare(ctx, a.pidFare, a.deviceSerial, paym, a.params)
 				if err != nil {
 					if errors.Is(err, payment.ErrorBalance) {
 						return nil, NewErrorScreen("saldo insuficiente", err.Error())
@@ -429,7 +429,7 @@ func (a *Actor) RunState(ctx actor.Context) {
 				// logs.LogInfo.Printf("msg seq: %d", msg.Seq)
 
 				if len(hr) > 0 &&
-					hr[len(hr)-1].DeviceID() == uint(a.deviceIDnum) &&
+					hr[len(hr)-1].DeviceID() == uint(a.deviceSerial) &&
 					hr[len(hr)-1].RechargeProp("Seq") != nil {
 					seq, ok := hr[len(hr)-1].RechargeProp("Seq").(int)
 					if ok && int32(seq) == msg.GetSeq() {
@@ -464,10 +464,12 @@ func (a *Actor) RunState(ctx actor.Context) {
 		a.behavior.Become(a.AwaitState)
 	case *messages.MsgSEError:
 		a.fmachine.Event(eError, NewErrorScreen("error de sistema", "Security Element error"))
-		logstrans.LogError.Printf("--- SE error, err: %s", msg.Error)
+		logstrans.LogError.Printf("SE error, err: %s", msg.Error)
 		a.behavior.Become(a.AwaitState)
 		if a.pidUso != nil {
 			ctx.Request(a.pidUso, &usostransporte.MsgVerifyDB{})
 		}
+	case *messages.MsgPaymentError:
+		logstrans.LogError.Printf("payment error, err: %s", msg.Error)
 	}
 }

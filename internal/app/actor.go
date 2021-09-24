@@ -26,10 +26,10 @@ import (
 )
 
 type Actor struct {
-	behavior    actor.Behavior
-	deviceID    string
-	version     string
-	deviceIDnum int
+	behavior     actor.Behavior
+	deviceID     string
+	version      string
+	deviceSerial int
 	// lastTag        uint64
 	// lastTimeDetect time.Time
 	// errorWriteTag  uint64
@@ -74,7 +74,7 @@ func NewActor(id string, version string) actor.Actor {
 	a.version = version
 	varSplit := strings.Split(id, "-")
 	if len(varSplit) > 0 {
-		a.deviceIDnum, _ = strconv.Atoi(varSplit[len(varSplit)-1])
+		a.deviceSerial, _ = strconv.Atoi(varSplit[len(varSplit)-1])
 	}
 	a.newFSM(nil)
 	go a.RunFSM()
@@ -90,6 +90,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
 	case *actor.Stopping:
 		logs.LogWarn.Printf("\"%s\" - Stopped actor, reason -> %v", ctx.Self(), msg)
+		ctx.Send(ctx.Self(), &MsgStop{})
+	case *MsgStop:
 		a.writeerrorverify()
 		if a.pidParams != nil {
 			ctx.Send(a.pidParams, &parameters.AppParameters{
@@ -168,7 +170,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.outputs = int(a.params.Outputs)
 		}
 		if a.params.DevSerial > 0 {
-			a.deviceIDnum = a.params.DevSerial
+			a.deviceSerial = a.params.DevSerial
 		}
 		if a.pidList != nil {
 			for _, list := range a.params.RestrictiveList {
@@ -181,7 +183,8 @@ func (a *Actor) Receive(ctx actor.Context) {
 			a.listRestrictive = make(map[string]*lists.WatchList)
 		}
 		a.listRestrictive[msg.ID] = msg
-		logstrans.LogInfo.Printf("watch over lists: %+v", a.listRestrictive)
+		logstrans.LogInfo.Printf("watch over lists: id: %v, type: %v, version: %v",
+			msg.ID, msg.PaymentMediumType, msg.Version)
 	case *MsgReqAddress:
 
 	case *messages.RegisterGraphActor:

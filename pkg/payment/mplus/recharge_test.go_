@@ -1,0 +1,99 @@
+package mplus
+
+import (
+	"testing"
+	"time"
+
+	"github.com/dumacp/go-fareCollection/pkg/payment"
+)
+
+func Test_mplus_AddRecharge(t *testing.T) {
+
+	data := map[string]interface{}{
+		"AC": 0, "B": 0, "CT$": 287, "FV": 0, "HISTR_CK_1": 0, "HISTR_CK_2": 0, "HISTR_CT_1": 0,
+		"HISTR_CT_2": 0, "HISTR_FT_1": 0, "HISTR_FT_2": 0, "HISTR_IDV_1": 0, "HISTR_IDV_2": 0,
+		"HISTR_TT_1": 0, "HISTR_TT_2": 0, "HISTR_VT_1": 0, "HISTR_VT_2": 0, "HISTU_CK_1": 0,
+		"HISTU_CK_2": 0, "HISTU_CK_3": 0, "HISTU_CK_4": 0, "HISTU_CK_5": 0, "HISTU_CK_6": 0,
+		"HISTU_FID_1": 60, "HISTU_FID_2": 60, "HISTU_FID_3": 60, "HISTU_FID_4": 60, "HISTU_FID_5": 60,
+		"HISTU_FID_6": 60, "HISTU_FT_1": 1629476142, "HISTU_FT_2": 1629476128,
+		"HISTU_FT_3": 1629476131, "HISTU_FT_4": 1629476135, "HISTU_FT_5": 1629476138,
+		"HISTU_FT_6": 1629476125, "HISTU_IDV_1": 1, "HISTU_IDV_2": 1, "HISTU_IDV_3": 1,
+		"HISTU_IDV_4": 1, "HISTU_IDV_5": 1, "HISTU_IDV_6": 1, "HISTU_ITI_1": 294, "HISTU_ITI_2": 294,
+		"HISTU_ITI_3": 294, "HISTU_ITI_4": 294, "HISTU_ITI_5": 294, "HISTU_ITI_6": 294,
+		"NT": 423155169, "P": 1, "PMR": 0, "ST$": 1492000, "STB$": 1490000, "VL": 1,
+	}
+
+	type fields struct {
+		id              string
+		ttype           string
+		mid             uint64
+		pid             uint
+		historical      []payment.Historical
+		balance         int
+		profileID       uint
+		pmr             bool
+		ac              uint
+		recharged       []payment.HistoricalRecharge
+		consecutive     uint
+		versionLayout   uint
+		lock            bool
+		dateValidity    time.Time
+		rawDataBefore   interface{}
+		rawDataAfter    interface{}
+		actualMap       map[string]interface{}
+		updateMap       map[string]interface{}
+		fareID          uint
+		lockReason      string
+		lockList        string
+		lockListVersion float32
+		coord           string
+		err             string
+	}
+	type args struct {
+		value       int
+		deviceID    uint
+		typeT       uint
+		consecutive uint
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &mplus{
+				id:              tt.fields.id,
+				ttype:           tt.fields.ttype,
+				mid:             tt.fields.mid,
+				pid:             tt.fields.pid,
+				historical:      tt.fields.historical,
+				balance:         tt.fields.balance,
+				profileID:       tt.fields.profileID,
+				pmr:             tt.fields.pmr,
+				ac:              tt.fields.ac,
+				recharged:       tt.fields.recharged,
+				consecutive:     tt.fields.consecutive,
+				versionLayout:   tt.fields.versionLayout,
+				lock:            tt.fields.lock,
+				dateValidity:    tt.fields.dateValidity,
+				rawDataBefore:   tt.fields.rawDataBefore,
+				rawDataAfter:    tt.fields.rawDataAfter,
+				actualMap:       tt.fields.actualMap,
+				updateMap:       tt.fields.updateMap,
+				fareID:          tt.fields.fareID,
+				lockReason:      tt.fields.lockReason,
+				lockList:        tt.fields.lockList,
+				lockListVersion: tt.fields.lockListVersion,
+				coord:           tt.fields.coord,
+				err:             tt.fields.err,
+			}
+			if err := p.AddRecharge(tt.args.value, tt.args.deviceID, tt.args.typeT, tt.args.consecutive); (err != nil) != tt.wantErr {
+				t.Errorf("mplus.AddRecharge() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -20,3 +20,5 @@ type MsgWriteAppParams struct{}
 type MsgReqAddress struct {
 	Addr string
 }
+type MsgStop struct {
+}

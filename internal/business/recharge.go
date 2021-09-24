@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/recharge"
 	"github.com/dumacp/go-fareCollection/pkg/payment"
 )
@@ -15,6 +16,8 @@ func RechargeQR(paym payment.Payment,
 	}
 
 	if paym.PID() != data.PID {
+		logstrans.LogError.Printf("tarjeta no coincide con la recarga, detectada: %d vs recarga: %d",
+			paym.PID(), data.PID)
 		return nil, errors.New("tarjeta no coincide con la recarga")
 	}
 	if data.Value <= 0 {
@@ -36,7 +39,6 @@ func RechargeQR(paym payment.Payment,
 			if v.TimeTransaction().After(data.Date) {
 				return nil, errors.New("recarga ya no es válida")
 			}
-			break
 		}
 	}
 	// if tt.After(data.Date) {

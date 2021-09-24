@@ -10,20 +10,21 @@ import (
 	"github.com/AsynkronIT/protoactor-go/eventstream"
 	"github.com/dumacp/go-fareCollection/internal/database"
 	"github.com/dumacp/go-fareCollection/internal/itinerary"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
 
 const (
-	defaultURL                   = "%s/api/external-system-gateway/rest/dev-summary"
-	paymentMediumURL             = "%s/api/external-system-gateway/rest/payment-medium-types/"
-	defaultUsername              = "dev.nebulae"
-	filterHttpQuery              = "?page=%d&count=%d&active=true"
-	defaultPassword              = "uno.2.tres"
-	dbpath                       = "/SD/boltdb/parametersdb"
-	databaseName                 = "parametersdb"
-	collectionNameData           = "parameters"
-	collectionPaymentMediumsData = "Mediums"
+	defaultURL         = "%s/api/external-system-gateway/rest/dev-summary"
+	paymentMediumURL   = "%s/api/external-system-gateway/rest/payment-medium-types/"
+	defaultUsername    = "dev.nebulae"
+	filterHttpQuery    = "?page=%d&count=%d&active=true"
+	defaultPassword    = "uno.2.tres"
+	dbpath             = "/SD/boltdb/parametersdb"
+	databaseName       = "parametersdb"
+	collectionNameData = "parameters"
+	keyId              = "params"
 )
 
 type Actor struct {
@@ -115,7 +116,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(a.db, &database.MsgUpdateData{
 				Database:   databaseName,
 				Collection: collectionNameData,
-				ID:         a.parameters.ID,
+				ID:         keyId,
 				Data:       data,
 			})
 		}
@@ -148,7 +149,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			ctx.Send(a.db, &database.MsgUpdateData{
 				Database:   databaseName,
 				Collection: collectionNameData,
-				ID:         a.parameters.ID,
+				ID:         keyId,
 				Data:       data,
 			})
 		}
@@ -172,6 +173,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 				if a.platformParameters == nil || a.platformParameters.Timestamp < result.Timestamp {
 
+					logstrans.LogInfo.Printf("Get params: %+v", result)
 					a.platformParameters = &result
 					if a.parameters == nil {
 						isUpdateMap = true
@@ -192,7 +194,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 						ctx.Send(a.db, &database.MsgUpdateData{
 							Database:   databaseName,
 							Collection: collectionNameData,
-							ID:         a.parameters.ID,
+							ID:         keyId,
 							Data:       data,
 						})
 					}
@@ -202,7 +204,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			}(); err != nil {
 				logs.LogError.Println(err)
 				go func() {
-					if a.parameters == nil {
+					if a.platformParameters == nil {
 						time.Sleep(30 * time.Second)
 						ctx.Send(ctx.Self(), &MsgGetParameters{})
 					}
@@ -227,7 +229,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Request(a.db, &database.MsgQueryData{
 			Database:   databaseName,
 			Collection: collectionNameData,
-			PrefixID:   a.id,
+			PrefixID:   keyId,
 			Reverse:    false,
 		})
 	case *database.MsgQueryResponse:

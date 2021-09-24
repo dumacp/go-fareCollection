@@ -2,7 +2,6 @@ package fare
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -11,6 +10,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/internal/database"
 	"github.com/dumacp/go-fareCollection/internal/itinerary"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/utils"
 	"github.com/dumacp/go-logs/pkg/logs"
 )
@@ -167,7 +167,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 					q.FromModeID = a.itineraryMap[msg.ItineraryID].ModePaymentMediumCode
 					q.FromRouteID = a.itineraryMap[msg.ItineraryID].RoutePaymentMediumCode
 				} else {
-					logs.LogError.Printf("itinerary not found: %d", msg.FromItineraryID)
+					logstrans.LogError.Printf("itinerary not found: %d", msg.FromItineraryID)
 					//TODO: ?
 					// if a.pidItinerary != nil {
 					// 	ctx.Request(a.pidItinerary, &itinerary.MsgGetMap{})
@@ -203,7 +203,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			logs.LogBuild.Printf("fare query: %#v", q)
 			fare := a.fareMap.FindFare(q)
 			if fare == nil {
-				return nil, errors.New("fare Policy not found")
+				return nil, fmt.Errorf("fare Policy not found, query: %+v", q)
 			}
 			logs.LogBuild.Printf("fare found out: %#v", q)
 			return fare, nil

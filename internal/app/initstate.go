@@ -29,9 +29,19 @@ func (a *Actor) InitState(ctx actor.Context) {
 			ctx.Send(a.pidGraph, screen0)
 			time.Sleep(1 * time.Second)
 		}
-		if a.isReaderOk {
+		switch {
+		case a.isReaderOk && a.params != nil && a.params.PaymentItinerary > 0:
 			a.fmachine.Event(eStarted)
 			a.behavior.Become(a.RunState)
+		case a.params != nil && a.params.PaymentItinerary == 0:
+			if a.pidGraph != nil {
+				screen0 := &graph.Loading{
+					ID:      0,
+					Msg:     "itinerary is NOT ok",
+					Percent: -1,
+				}
+				ctx.Send(a.pidGraph, screen0)
+			}
 		}
 	case *messages.RegisterGraphActor:
 		screen0 := &graph.Loading{
@@ -59,9 +69,19 @@ func (a *Actor) InitState(ctx actor.Context) {
 				}()
 			}
 		} else {
-			if a.isReaderOk {
+			switch {
+			case a.isReaderOk && a.params != nil && a.params.PaymentItinerary > 0:
 				a.fmachine.Event(eStarted)
 				a.behavior.Become(a.RunState)
+			case a.params != nil && a.params.PaymentItinerary == 0:
+				if a.pidGraph != nil {
+					screen0 := &graph.Loading{
+						ID:      0,
+						Msg:     "itinerary is NOT ok",
+						Percent: -1,
+					}
+					ctx.Send(a.pidGraph, screen0)
+				}
 			}
 		}
 	case *usostransporte.MsgOkDB:
@@ -133,9 +153,19 @@ func (a *Actor) InitState(ctx actor.Context) {
 				}
 			}()
 		}
-		if a.params != nil {
+		switch {
+		case a.params != nil && a.params.PaymentItinerary > 0:
 			a.fmachine.Event(eStarted)
 			a.behavior.Become(a.RunState)
+		case a.params != nil && a.params.PaymentItinerary == 0:
+			if a.pidGraph != nil {
+				screen0 := &graph.Loading{
+					ID:      0,
+					Msg:     "itinerary is NOT ok",
+					Percent: -1,
+				}
+				ctx.Send(a.pidGraph, screen0)
+			}
 		}
 	}
 }

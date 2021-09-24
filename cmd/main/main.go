@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	version = "1.0.1"
+	version = "1.0.3"
 )
 
 var verbose int
@@ -235,10 +235,10 @@ func main() {
 	funcReader := func() smartcard.IReader {
 		// if !firsboot {
 		// 	firsboot = false
-		exec.Command("/bin/sh", "-c", "echo 0 > /sys/class/leds/enable-reader/brightness").Run()
+		exec.Command("/bin/sh", "-c", "echo 0 > /sys/class/leds/power-reader/brightness").Run()
 		time.Sleep(1 * time.Second)
 		// }
-		if res, err := exec.Command("/bin/sh", "-c", "echo 1 > /sys/class/leds/enable-reader/brightness").CombinedOutput(); err != nil {
+		if res, err := exec.Command("/bin/sh", "-c", "echo 1 > /sys/class/leds/power-reader/brightness").CombinedOutput(); err != nil {
 			logs.LogError.Printf("%s, err: %s", res, err)
 			logstrans.LogError.Printf("%s, err: %s", res, err)
 		}
@@ -297,8 +297,9 @@ func main() {
 	signal.Notify(finish, syscall.SIGTERM)
 
 	for range finish {
-		ctx.Poison(pidApp)
+		ctx.Send(pidApp, &app.MsgStop{})
 		time.Sleep(1 * time.Second)
+		ctx.Poison(pidApp)
 		log.Print("Finish")
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/AsynkronIT/protoactor-go/actor"
 	"github.com/dumacp/go-fareCollection/internal/fare"
 	"github.com/dumacp/go-fareCollection/internal/lists"
+	"github.com/dumacp/go-fareCollection/internal/logstrans"
 	"github.com/dumacp/go-fareCollection/internal/parameters"
 	"github.com/dumacp/go-fareCollection/internal/qr"
 	"github.com/dumacp/go-fareCollection/pkg/messages"
@@ -146,6 +147,7 @@ func CalcUpdatesWithFare(ctx actor.Context, pidFare *actor.PID, deviceID int,
 
 		if _, err := paym.ApplyFare(fareData); err != nil {
 			// time.Sleep(3 * time.Second)
+			logstrans.LogWarn.Printf("apply fare policy err, fare: %+v", fareData)
 			return nil, err
 		}
 		return paym.Updates(), nil

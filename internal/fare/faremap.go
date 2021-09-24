@@ -50,15 +50,20 @@ func CreateTree(m map[int]*FareNode) FareMap {
 		if _, ok := fm[idString.String()]; !ok {
 			fm[idString.String()] = make([]*FareNode, 0)
 		}
+		// log.Printf("idString: %s", idString.String())
 		fm[idString.String()] = append(fm[idString.String()], node)
 	}
 	return fm
 }
 
 func (fm FareMap) FindPlainFare(query *QueryFare) *FareNode {
+	// log.Printf("findPlainFare, query: %v", query)
 	for _, k := range query.KeyIndexesWithProfile() {
+		// log.Printf("findPlainFare, 0: %v", k)
 		if fs, ok := fm[k]; ok {
+			// log.Printf("findPlainFare, 1: %v", fs)
 			for _, f := range fs {
+				// log.Printf("findPlainFare, 2: %v", f)
 				if query.VerifyFare(f) {
 					return f
 				}

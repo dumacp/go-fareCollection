@@ -60,7 +60,7 @@ func Post(client *http.Client,
 		break
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("post error, err: request: %+v, err: %w", req, err)
 	}
 	defer resp.Body.Close()
 
@@ -69,7 +69,7 @@ func Post(client *http.Client,
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("StatusCode: %d, resp: %s, req: %s", resp.StatusCode, body, req.URL)
+		return nil, fmt.Errorf("StatusCode: %d, resp: %s, req: %+v", resp.StatusCode, body, req)
 	}
 	return ioutil.ReadAll(resp.Body)
 }

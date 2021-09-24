@@ -21,6 +21,7 @@ const (
 	defaultUsername = "dev.nebulae"
 	// filterHttpQuery    = "?page=%d&count=%d&active=true"
 	defaultPassword     = "uno.2.tres"
+	dbbkpath            = "/SD/boltdb/usosdb-BK"
 	dbpath              = "/SD/boltdb/usosdb"
 	databaseName        = "usosdb"
 	collectionUsosData  = "usos"
@@ -35,7 +36,8 @@ type Actor struct {
 	url        string
 	urlLock    string
 	// id         string
-	db *actor.PID
+	db   *actor.PID
+	dbbk *actor.PID
 }
 
 func NewActor() actor.Actor {
@@ -56,10 +58,21 @@ func (a *Actor) Receive(ctx actor.Context) {
 
 		db, err := database.Open(ctx.ActorSystem().Root, dbpath)
 		if err != nil {
-			logs.LogError.Println(err)
+			logstrans.LogError.Printf("open database usos err: %s", err)
+			time.Sleep(6 * time.Second)
+			panic(err)
 		}
 		if db != nil {
 			a.db = db.PID()
+		}
+		dbbk, err := database.Open(ctx.ActorSystem().Root, dbbkpath)
+		if err != nil {
+			logstrans.LogError.Printf("open database usos-bk err: %s", err)
+			time.Sleep(6 * time.Second)
+			panic(err)
+		}
+		if dbbk != nil {
+			a.dbbk = dbbk.PID()
 		}
 
 		a.quit = make(chan int)
@@ -71,6 +84,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 		ctx.Send(ctx.Self(), &MsgGetInDB{})
 	case *MsgUso:
 		if err := func() error {
+			if a.db == nil {
+				return fmt.Errorf("not database usos: %w", ErrorDB)
+			}
 			uso := msg.Data
 			data, err := json.Marshal(uso)
 			if err != nil {
@@ -81,25 +97,28 @@ func (a *Actor) Receive(ctx actor.Context) {
 			} else {
 				logstrans.LogTransInfo.Printf("uso transporte: %s", data)
 			}
+			ctx.Request(a.dbbk, &database.MsgUpdateData{
+				Database:   databaseName,
+				Collection: collectionUsosData,
+				ID:         uso.ID,
+				Data:       data,
+			})
 			if resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, data); err != nil {
-				if a.db != nil {
-					ctx.Request(a.db, &database.MsgUpdateData{
-						Database:   databaseName,
-						Collection: collectionUsosData,
-						ID:         uso.ID,
-						Data:       data,
-					})
-				} else {
-					return fmt.Errorf("(db is null) resp post: %s, err: %s, %w", resp, err, ErrorDB)
-				}
-				return fmt.Errorf("err post: %s, %w", resp, err)
+				ctx.Request(a.db, &database.MsgUpdateData{
+					Database:   databaseName,
+					Collection: collectionUsosData,
+					ID:         uso.ID,
+					Data:       data,
+				})
+				return err
 			} else {
 				logstrans.LogBuild.Printf("response send uso: %s", resp)
 			}
 			return nil
 		}(); err != nil {
-			logstrans.LogError.Printf("send err: transaction with ID %s (payment ID = %s), err: %s",
+			logstrans.LogError.Printf("send err: transaction uso with ID %s (payment ID = %s), err: %s",
 				msg.Data.ID, msg.Data.PaymentMediumId, err)
+			// log.Printf("data uso: %v", msg.Data)
 			if errors.Is(err, ErrorDB) {
 				ctx.Send(ctx.Parent(), &MsgErrorDB{
 					Error: err.Error(),
@@ -108,6 +127,9 @@ func (a *Actor) Receive(ctx actor.Context) {
 		}
 	case *MsgLock:
 		if err := func() error {
+			if a.db == nil {
+				return fmt.Errorf("not database usos: %w", ErrorDB)
+			}
 			uso := msg.Data
 			data, err := json.Marshal(uso)
 			if err != nil {
@@ -118,25 +140,33 @@ func (a *Actor) Receive(ctx actor.Context) {
 			} else {
 				logstrans.LogTransWarn.Printf("lock: %s", data)
 			}
+			ctx.Request(a.dbbk, &database.MsgUpdateData{
+				Database:   databaseName,
+				Collection: collectionUsosData,
+				ID:         uso.ID,
+				Data:       data,
+			})
 			if resp, err := utils.Post(a.httpClient, a.urlLock, a.userHttp, a.passHttp, data); err != nil {
-				if a.db != nil {
-					ctx.Request(a.db, &database.MsgUpdateData{
-						Database:   databaseName,
-						Collection: collectionLocksData,
-						ID:         uso.ID,
-						Data:       data,
-					})
-				} else {
-					return fmt.Errorf("(db is empty) err post: %s, %w", resp, err)
-				}
-				return fmt.Errorf("err post: %s, %w", resp, err)
+				ctx.Request(a.db, &database.MsgUpdateData{
+					Database:   databaseName,
+					Collection: collectionLocksData,
+					ID:         uso.ID,
+					Data:       data,
+				})
+				return err
 			} else {
 				logstrans.LogBuild.Printf("response send lock: %s", resp)
 			}
 			return nil
 		}(); err != nil {
-			logstrans.LogError.Printf("send err: transaction with ID %s (payment ID = %s), err: %s",
+			logstrans.LogError.Printf("send err: transaction lock with ID %s (payment ID = %s), err: %s",
 				msg.Data.ID, msg.Data.PaymentMediumId, err)
+			// log.Printf("data lock: %v", msg.Data)
+			if errors.Is(err, ErrorDB) {
+				ctx.Send(ctx.Parent(), &MsgErrorDB{
+					Error: err.Error(),
+				})
+			}
 		}
 	case *MsgGetInDB:
 		if a.db == nil {
@@ -159,19 +189,23 @@ func (a *Actor) Receive(ctx actor.Context) {
 			if ctx.Sender() != nil {
 				ctx.Send(ctx.Sender(), &database.MsgQueryNext{})
 			}
-			if msg.Data == nil {
+			if len(msg.Data) <= 0 {
 				return nil
 			}
 			switch msg.Collection {
 			case collectionUsosData:
 				resp, err := utils.Post(a.httpClient, a.url, a.userHttp, a.passHttp, msg.Data)
 				if err != nil {
-					return fmt.Errorf("err post: %s, %w", resp, err)
+					return err
+				} else {
+					logstrans.LogBuild.Printf("response send lock: %s", resp)
 				}
 			case collectionLocksData:
 				resp, err := utils.Post(a.httpClient, a.urlLock, a.userHttp, a.passHttp, msg.Data)
 				if err != nil {
-					return fmt.Errorf("err post: %s, %w", resp, err)
+					return err
+				} else {
+					logstrans.LogBuild.Printf("response send lock: %s", resp)
 				}
 			}
 			ctx.Send(a.db, &database.MsgDeleteData{
@@ -182,6 +216,7 @@ func (a *Actor) Receive(ctx actor.Context) {
 			return nil
 		}(); err != nil {
 			logstrans.LogError.Printf("send err: transactionID with ID %s, err: %s", msg.ID, err)
+			// log.Printf("data uso: %s", msg.Data)
 		}
 	case *database.MsgNoAckPersistData:
 		logstrans.LogError.Printf("error in DB, err: %s",
